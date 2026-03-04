@@ -17,11 +17,13 @@ coverage/
 .env.production
 .env.*.local
 
-# Sensitive docs
+# Sensitive / internal docs
 SERVER_ACCESS.md
 INFO.md
 SITE_DESCRIPTION.md
 SITE_DESCRIPTION_EMAIL.md
+DEV_LOG.md
+soul.md
 
 # Data / DB
 data/
@@ -47,6 +49,9 @@ Thumbs.db
 
 # Cursor internal
 .cursor/
+
+# Private AI Advisor (proprietary)
+packages/ai-advisor/
 
 # Lock files (keep package-lock.json for reproducibility)
 # package-lock.json

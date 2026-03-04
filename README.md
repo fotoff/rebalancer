@@ -18,10 +18,11 @@ Rebalancer automatically monitors token pairs and executes rebalancing swaps whe
 ```
 packages/
 ├── web/              # Next.js 15 frontend + API
-├── ai-advisor/       # Python/FastAPI AI recommendation engine
 ├── trigger-checker/  # Node.js trigger monitoring service
 └── contracts/        # Solidity smart contracts (RebalancerVault V3)
 ```
+
+> **AI Advisor** — a proprietary Python/FastAPI service that powers the AI recommendations. Not included in this repository.
 
 ### Tech Stack
 
@@ -29,7 +30,7 @@ packages/
 |-------|-----------|
 | Frontend | Next.js 15, React, Tailwind CSS, RainbowKit, wagmi, viem |
 | Backend API | Next.js API Routes, SQLite (better-sqlite3) |
-| AI Advisor | Python 3.12+, FastAPI, numpy, pandas, httpx |
+| AI Advisor | Proprietary (Python/FastAPI) |
 | Smart Contract | Solidity, Hardhat, Base Mainnet |
 | Swap Routing | LI.FI API |
 | Market Data | DexScreener, CoinGecko |
@@ -63,14 +64,6 @@ cp ../../.env.example .env.local
 npm install
 npm run dev
 
-# Setup AI Advisor (optional)
-cd packages/ai-advisor
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# Fill in your config in .env
-uvicorn src.main:app --host 127.0.0.1 --port 8000
 ```
 
 ### Environment Variables
@@ -102,9 +95,6 @@ The project runs on a VDS with PM2 process manager:
 ```bash
 # Web (Next.js)
 pm2 start npm --name rebalancer-web -- start
-
-# AI Advisor (Python)
-pm2 start ecosystem.config.cjs  # in packages/ai-advisor/
 
 # Trigger Checker (Node.js)
 pm2 start checker.mjs --name trigger-checker  # in packages/trigger-checker/
