@@ -1,0 +1,23 @@
+// Base mainnet token addresses
+export const TOKENS = {
+  USDC: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const,
+  WETH: "0x4200000000000000000000000000000000000006" as const,
+  AERO: "0x940181a94A35A4569E4529A3CDfB74e38FD98631" as const,
+  cbETH: "0x2Ae3F1Ec8989c8cf8f6180226674bcb15EE04531" as const,
+  DEGEN: "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed" as const,
+  WBTC: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c" as const,
+  wstETH: "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452" as const,
+  BRETT: "0x532f27101965dd16442E59d40670FaF5eBB142E4" as const,
+  TOSHI: "0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4" as const,
+  OWB: "0xEF5997c2cf2f6c138196f8A6203afc335206b3c1" as const,
+} as const;
+
+// Aerodrome Router V2 & Pool Factories on Base
+export const AERODROME_ROUTER = "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43" as const;
+export const AERODROME_FACTORY = "0x420DD381b31aEf6683db6B902084cB0FFECe40Da" as const;
+export const AERODROME_CL_FACTORY = "0x5e7BB104d84c7CB9B682AaC2F3d509f5F406809A" as const;
+
+// RebalancerVault - will be set after deploy
+export const REBALANCER_VAULT_ADDRESS =
+  (process.env.NEXT_PUBLIC_VAULT_ADDRESS as `0x${string}`) ||
+  "0x0000000000000000000000000000000000000000";

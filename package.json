@@ -1,0 +1,16 @@
+{
+  "name": "rebalancer",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=packages/web",
+    "dev:safe": "ulimit -n 10240 2>/dev/null; npm run dev --workspace=packages/web",
+    "build": "npm run build --workspace=packages/web",
+    "start": "npm run start --workspace=packages/web",
+    "contracts:compile": "npm run compile --workspace=packages/contracts",
+    "contracts:test": "npm run test --workspace=packages/contracts"
+  }
+}

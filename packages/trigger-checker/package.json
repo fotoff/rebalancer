@@ -1,0 +1,12 @@
+{
+  "name": "rebalancer-trigger-checker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node checker.mjs"
+  },
+  "dependencies": {
+    "viem": "^2.0.0"
+  }
+}

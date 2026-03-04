@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Build output
+.next/
+dist/
+artifacts/
+cache/
+coverage/
+
+# Environment / secrets
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Sensitive docs
+SERVER_ACCESS.md
+INFO.md
+SITE_DESCRIPTION.md
+SITE_DESCRIPTION_EMAIL.md
+
+# Data / DB
+data/
+*.db
+*.sqlite
+data/pairs.json
+data/triggers.json
+
+# Backups
+backups/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+.pm2/
+
+# IDE
+.vscode/
+.idea/
+
+# Cursor internal
+.cursor/
+
+# Lock files (keep package-lock.json for reproducibility)
+# package-lock.json
