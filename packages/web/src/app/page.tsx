@@ -127,6 +127,15 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-3 text-xs text-white/30">
               <a
+                href="https://github.com/fotoff/rebalancer"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white/50"
+              >
+                GitHub
+              </a>
+              <span>·</span>
+              <a
                 href={`https://basescan.org/address/${process.env.NEXT_PUBLIC_VAULT_ADDRESS ?? ""}`}
                 target="_blank"
                 rel="noopener noreferrer"

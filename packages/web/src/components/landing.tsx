@@ -237,7 +237,9 @@ export function Landing() {
             Connect your wallet and let AI manage your token pairs on Base.
             Non-custodial. Transparent. Automatic.
           </p>
-          <ConnectButton />
+          <div className="flex justify-center">
+            <ConnectButton />
+          </div>
         </div>
       </section>
 
@@ -263,6 +265,15 @@ export function Landing() {
               </span>
             </div>
             <div className="flex items-center gap-3 text-xs text-white/30">
+              <a
+                href="https://github.com/fotoff/rebalancer"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white/50"
+              >
+                GitHub
+              </a>
+              <span>&middot;</span>
               <a
                 href={`https://basescan.org/address/${process.env.NEXT_PUBLIC_VAULT_ADDRESS ?? ""}`}
                 target="_blank"
