@@ -27,15 +27,23 @@ export function useTokenPrices(
     ],
     queryFn: async () => {
       if (!addrKey) return {};
-      const params = new URLSearchParams({ addresses: addrKey });
-      if (poolFallback) params.set("pool_fallback", "true");
-      const res = await fetch(`/api/prices?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch prices");
-      return (await res.json()) as Record<string, number>;
+      const allAddrs = addrKey.split(",");
+      const CHUNK = 25;
+      const merged: Record<string, number> = {};
+      for (let i = 0; i < allAddrs.length; i += CHUNK) {
+        const chunk = allAddrs.slice(i, i + CHUNK).join(",");
+        const params = new URLSearchParams({ addresses: chunk });
+        if (poolFallback) params.set("pool_fallback", "true");
+        const res = await fetch(`/api/prices?${params}`);
+        if (!res.ok) continue;
+        const data = (await res.json()) as Record<string, number>;
+        Object.assign(merged, data);
+      }
+      return merged;
     },
     enabled: addrKey.length > 0,
     staleTime: poolFallback ? 120_000 : 60_000,
-    gcTime: 5 * 60_000, // keep in cache 5 min even after all subscribers unmount
+    gcTime: 5 * 60_000,
     placeholderData: keepPreviousData,
   });
 }

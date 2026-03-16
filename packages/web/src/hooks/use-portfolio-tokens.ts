@@ -88,9 +88,35 @@ export function usePortfolioTokens() {
   const useScan = scannedTokens.length > 0;
 
   const tokenAddresses = useMemo(() => {
-    const addrs = useScan
-      ? scannedTokens.map((t) => t.address.toLowerCase())
-      : [];
+    if (!useScan) return [] as string[];
+
+    const knownSet = new Set(
+      Object.values(TOKENS).map((a) => a.toLowerCase())
+    );
+    // High-value tokens with small numeric balances (e.g. cbBTC 0.0002 = $15)
+    const highValue = new Set([
+      "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf", // cbBTC
+      ...knownSet,
+    ]);
+
+    const known: string[] = [];
+    const rest: typeof scannedTokens = [];
+
+    for (const t of scannedTokens) {
+      if (t.balanceFormatted <= 0) continue;
+      const addr = t.address.toLowerCase();
+      if (highValue.has(addr)) {
+        known.push(addr);
+      } else if (t.balanceFormatted >= 0.01) {
+        rest.push(t);
+      }
+    }
+
+    // Sort rest by balance desc, take top N to stay under URL limits
+    rest.sort((a, b) => b.balanceFormatted - a.balanceFormatted);
+    const limit = 60 - known.length;
+    const addrs = [...known, ...rest.slice(0, limit).map((t) => t.address.toLowerCase())];
+
     if (ethBalance?.value && Number(formatUnits(ethBalance.value, 18)) > 0) {
       if (!addrs.includes(TOKENS.WETH.toLowerCase())) {
         addrs.push(TOKENS.WETH.toLowerCase());

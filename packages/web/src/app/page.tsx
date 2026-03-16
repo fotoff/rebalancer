@@ -8,6 +8,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Header } from "@/components/header";
 import { Landing } from "@/components/landing";
 import { PortfolioList } from "@/components/portfolio/portfolio-list";
+import { PairSuggestions } from "@/components/pairs/pair-suggestions";
 import { PairCreator } from "@/components/pairs/pair-creator";
 import { SavedPairs } from "@/components/pairs/saved-pairs";
 import { VaultBalancesProvider } from "@/hooks/use-vault-balances";
@@ -93,6 +94,7 @@ export default function Home() {
           <VaultBalancesProvider>
             <div className="space-y-8">
               <PortfolioList onAddToPair={handleAddToPair} />
+              <PairSuggestions onCreatePair={handlePairCreated} />
               <SavedPairs onSelectPair={handleSelectPair} />
               <PairCreator
                 suggestedToken={suggestForPair}

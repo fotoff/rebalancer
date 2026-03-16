@@ -43,8 +43,8 @@ const STEPS = [
   },
   {
     num: "02",
-    title: "Create a Pair",
-    desc: "Pick two tokens you want to rebalance. Deposit them into the vault.",
+    title: "Find Opportunities",
+    desc: "AI scans your wallet, analyzes all token pairs for divergence, and suggests the best rebalancing candidates.",
   },
   {
     num: "03",
@@ -150,33 +150,91 @@ export function Landing() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="how-it-works" className="bg-white/[0.02] py-20">
+      {/* Pair Discovery */}
+      <section className="bg-white/[0.02] py-20">
         <div className="mx-auto max-w-4xl px-4">
           <div className="mb-12 text-center">
             <h3 className="mb-3 text-3xl font-bold text-white">
-              How it works
+              Discover rebalancing opportunities
             </h3>
-            <p className="text-white/50">
-              From connect to auto-rebalancing in 4 simple steps.
+            <p className="mx-auto max-w-2xl text-white/50">
+              Don&apos;t know which pairs to create? Our AI scans your entire
+              wallet and finds the best rebalancing candidates automatically.
             </p>
           </div>
-          <div className="grid gap-8 sm:grid-cols-2">
-            {STEPS.map((s) => (
-              <div key={s.num} className="flex gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-lg font-bold text-blue-400">
-                  {s.num}
-                </div>
-                <div>
-                  <h4 className="mb-1 text-lg font-semibold text-white">
-                    {s.title}
-                  </h4>
-                  <p className="text-sm leading-relaxed text-white/50">
-                    {s.desc}
-                  </p>
-                </div>
+
+          <div className="grid gap-6 sm:grid-cols-3">
+            <div className="rounded-xl border border-white/10 bg-black/30 p-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10 text-2xl">
+                👛
               </div>
-            ))}
+              <h4 className="mb-2 font-semibold text-white">Wallet Scan</h4>
+              <p className="text-sm text-white/40">
+                AI reads all tokens in your wallet and fetches real-time prices
+                and price changes across multiple timeframes.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-black/30 p-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-purple-500/10 text-2xl">
+                📈
+              </div>
+              <h4 className="mb-2 font-semibold text-white">
+                Divergence Analysis
+              </h4>
+              <p className="text-sm text-white/40">
+                Every possible token pair is analyzed for price divergence (1h,
+                6h, 24h), market regime, and expected edge in basis points.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-black/30 p-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-2xl">
+                ✅
+              </div>
+              <h4 className="mb-2 font-semibold text-white">
+                Ranked Suggestions
+              </h4>
+              <p className="text-sm text-white/40">
+                Pairs are scored and ranked. Actionable opportunities
+                (Set Triggers, Rebalance Now) are highlighted — add a pair with
+                one click.
+              </p>
+            </div>
+          </div>
+
+          {/* Mock card */}
+          <div className="mt-10 flex justify-center">
+            <div className="w-full max-w-sm rounded-xl border border-blue-500/20 bg-blue-500/5 px-5 py-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-medium text-white">ETH / USDC</span>
+                <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                  Set triggers
+                </span>
+              </div>
+              <div className="mb-2 flex items-center gap-3 text-xs">
+                <span className="text-purple-400">Mean Reversion</span>
+                <span className="text-white/50">
+                  Edge:{" "}
+                  <span className="text-emerald-400">+156 bps</span>
+                </span>
+              </div>
+              <div className="mb-2 flex gap-4 text-xs">
+                <span>
+                  <span className="text-white/30">1h: </span>
+                  <span className="text-emerald-400">+0.4%</span>
+                </span>
+                <span>
+                  <span className="text-white/30">6h: </span>
+                  <span className="text-red-400">-1.2%</span>
+                </span>
+                <span>
+                  <span className="text-white/30">24h: </span>
+                  <span className="text-blue-400">+5.2%</span>
+                </span>
+              </div>
+              <p className="text-[11px] text-white/40">
+                ETH/USDC: Moderate divergence (5.2%), ETH leads
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -223,6 +281,37 @@ export function Landing() {
                 high-uncertainty conditions.
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section id="how-it-works" className="bg-white/[0.02] py-20">
+        <div className="mx-auto max-w-4xl px-4">
+          <div className="mb-12 text-center">
+            <h3 className="mb-3 text-3xl font-bold text-white">
+              How it works
+            </h3>
+            <p className="text-white/50">
+              From connect to auto-rebalancing in 4 simple steps.
+            </p>
+          </div>
+          <div className="grid gap-8 sm:grid-cols-2">
+            {STEPS.map((s) => (
+              <div key={s.num} className="flex gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-lg font-bold text-blue-400">
+                  {s.num}
+                </div>
+                <div>
+                  <h4 className="mb-1 text-lg font-semibold text-white">
+                    {s.title}
+                  </h4>
+                  <p className="text-sm leading-relaxed text-white/50">
+                    {s.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
