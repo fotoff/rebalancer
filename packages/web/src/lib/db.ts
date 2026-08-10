@@ -372,6 +372,22 @@ export const triggers = {
 
 // ─── Vault History ───────────────────────────────────────
 export const vaultHistory = {
+  /** Protocol-wide event counts by type (for public stats). */
+  countByType(): Record<string, number> {
+    const rows = getDb()
+      .prepare("SELECT type, COUNT(*) AS n FROM vault_history GROUP BY type")
+      .all() as Array<{ type: string; n: number }>;
+    return Object.fromEntries(rows.map((r) => [r.type, r.n]));
+  },
+
+  /** Distinct users that have any recorded vault activity. */
+  countUsers(): number {
+    const row = getDb()
+      .prepare("SELECT COUNT(DISTINCT user_address) AS n FROM vault_history")
+      .get() as { n: number } | undefined;
+    return row?.n ?? 0;
+  },
+
   getByUser(userAddress: string, pairId?: string): DbVaultEvent[] {
     if (pairId) {
       return getDb()

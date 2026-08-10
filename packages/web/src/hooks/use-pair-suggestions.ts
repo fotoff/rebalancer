@@ -51,7 +51,7 @@ export function usePairSuggestions() {
               balance: h.balance,
               usd_value: h.usdValue,
             })),
-            min_balance_usd: 5,
+            min_balance_usd: 0, // include every portfolio token, regardless of balance
             exclude_tokens: params.excludeTokens || [],
           }),
         });
@@ -62,8 +62,21 @@ export function usePairSuggestions() {
         }
 
         const data = await resp.json();
+        if (data.error) {
+          throw new Error(data.detail || data.error);
+        }
         const pairs: SuggestedPair[] = data.pairs ?? [];
         setSuggestions(pairs);
+        if (params.userAddress) {
+          try {
+            localStorage.setItem(
+              `pair-suggestions-${params.userAddress.toLowerCase()}`,
+              JSON.stringify({ ts: Date.now(), pairs })
+            );
+          } catch {
+            // ignore quota
+          }
+        }
         return pairs;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -76,11 +89,25 @@ export function usePairSuggestions() {
     []
   );
 
+  // Restore the last saved scan for a user; returns its age (ms) or null.
+  const loadCached = useCallback((userAddress: string): number | null => {
+    try {
+      const raw = localStorage.getItem(`pair-suggestions-${userAddress.toLowerCase()}`);
+      if (!raw) return null;
+      const { ts, pairs } = JSON.parse(raw) as { ts: number; pairs: SuggestedPair[] };
+      setSuggestions(pairs);
+      return Date.now() - ts;
+    } catch {
+      return null;
+    }
+  }, []);
+
   return {
     suggestions,
     loading,
     error,
     fetchSuggestions,
+    loadCached,
     clearSuggestions: () => setSuggestions([]),
   };
 }

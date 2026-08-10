@@ -11,11 +11,14 @@ import { useTokenPrices } from "@/hooks/use-token-prices";
 import { useTokenMeta } from "@/hooks/use-token-meta";
 import { useTokenInfo } from "@/hooks/use-token-info";
 import { useVaultBalances } from "@/hooks/use-vault-balances";
+import { useUserVault } from "@/hooks/use-user-vault";
 import { TOKENS } from "@/lib/constants";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DirectionToggle } from "./direction-toggle";
 import { TriggerForm } from "./trigger-form";
-import { VaultPanel } from "./vault-panel";
-import { ManualRebalance } from "./manual-rebalance";
+import { TokenCardActions } from "./token-card-actions";
+import { PairAnalytics } from "./pair-analytics";
 import { PriceChart } from "./price-chart";
 import { AiAdvisor } from "./ai-advisor";
 
@@ -31,10 +34,10 @@ function PriceChangeBadge({
   const isPositive = value > 0;
   const isZero = value === 0;
   const color = isZero
-    ? "text-white/50"
+    ? "text-muted-foreground"
     : isPositive
-      ? "text-emerald-400"
-      : "text-red-400";
+      ? "text-emerald-600"
+      : "text-red-600";
   return (
     <span className={`text-xs ${color}`}>
       {label}:{" "}
@@ -128,6 +131,7 @@ export function PairDashboard({ token1, token2, onBack }: PairDashboardProps) {
 
   // Shared vault balances (single source of truth via VaultBalancesProvider)
   const { vaultBalances: vaultBalancesRaw, refetchVault } = useVaultBalances([token1, token2]);
+  const { vaultAddress } = useUserVault();
   const vaultBal1Raw = vaultBalancesRaw[token1.toLowerCase()] ?? 0n;
   const vaultBal2Raw = vaultBalancesRaw[token2.toLowerCase()] ?? 0n;
 
@@ -173,240 +177,270 @@ export function PairDashboard({ token1, token2, onBack }: PairDashboardProps) {
     <div className="space-y-6">
       <button
         onClick={onBack}
-        className="text-sm text-white/60 hover:text-white"
+        className="text-sm text-muted-foreground hover:text-foreground"
       >
         ← Back to pairs
       </button>
 
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <h2 className="mb-4 text-lg font-semibold text-white">
-          Pair: {sym1} ⟷ {sym2}
-        </h2>
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="mb-4 text-lg font-semibold text-foreground">
+            Pair: {sym1} ⟷ {sym2}
+          </h2>
 
-        {/* Direction toggle (single button) + ratio */}
-        <DirectionToggle
-          fromSym={fromSym}
-          toSym={toSym}
-          direction={direction}
-          onChange={setDirection}
-          displayRatio={displayRatio}
-        />
+          {/* Direction toggle (single button) + ratio */}
+          <DirectionToggle
+            fromSym={fromSym}
+            toSym={toSym}
+            direction={direction}
+            onChange={setDirection}
+            displayRatio={displayRatio}
+          />
 
-        <div className="mt-6 space-y-4">
-          {/* Token cards: icon + price + balance + full contract link */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            {/* ---- Token 1 card ---- */}
-            <div className="rounded-lg border border-white/10 bg-black/30 p-4">
-              <div className="flex items-center gap-3">
-                <TokenLogo src={logo1} symbol={sym1} />
-                <div>
-                  <p className="font-medium text-white">{sym1}</p>
-                  <p className="text-lg font-semibold text-white">
-                    ${p1.toFixed(p1 >= 1 ? 2 : 6)}
-                  </p>
+          <div className="mt-6 space-y-4">
+            {/* Token cards: icon + price + balance + full contract link */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {/* ---- Token 1 card ---- */}
+              <Card>
+                <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <PriceChangeBadge label="1h" value={meta1?.priceChange1h} />
-                    <PriceChangeBadge label="24h" value={meta1?.priceChange24h} />
-                  </div>
-                </div>
-              </div>
-
-              {address ? (
-                <>
-                  {isWeth1 ? (
-                    <div className="mt-3 space-y-1 text-sm text-white/70">
-                      <p>ETH: {nativeEth.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
-                      <p>WETH: {bal1Num.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
-                      {vaultBal1 > 0 && (
-                        <p className="text-cyan-400/80">
-                          Vault: {vaultBal1.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="mt-3 space-y-1">
-                      <p className="text-sm text-white/70">
-                        Wallet: {bal1Num.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                    <TokenLogo src={logo1} symbol={sym1} />
+                    <div>
+                      <p className="font-medium text-foreground">{sym1}</p>
+                      <p className="text-lg font-semibold text-foreground">
+                        ${p1.toFixed(p1 >= 1 ? 2 : 6)}
                       </p>
-                      {vaultBal1 > 0 && (
-                        <p className="text-sm text-cyan-400/80">
-                          Vault: {vaultBal1.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                        </p>
-                      )}
+                      <div className="flex items-center gap-3">
+                        <PriceChangeBadge label="1h" value={meta1?.priceChange1h} />
+                        <PriceChangeBadge label="24h" value={meta1?.priceChange24h} />
+                      </div>
                     </div>
-                  )}
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-white/80">
-                      ≈ $
-                      {usd1.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-white/60">
-                      {pct1.toFixed(1)}%
-                    </span>
                   </div>
-                </>
-              ) : (
-                <p className="mt-3 text-white/50">—</p>
-              )}
 
-              <a
-                href={`https://basescan.org/token/${token1}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 flex items-center gap-1 break-all font-mono text-xs text-white/40 hover:text-[#0052FF] hover:underline"
-                title={token1}
-              >
-                {token1}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="shrink-0"
-                >
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-              </a>
+                  {address ? (
+                    <>
+                      {isWeth1 ? (
+                        <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+                          <p>ETH: {nativeEth.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
+                          <p>WETH: {bal1Num.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
+                          {vaultBal1 > 0 && (
+                            <p className="text-cyan-600">
+                              Vault: {vaultBal1.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mt-3 space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            Wallet: {bal1Num.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                          </p>
+                          {vaultBal1 > 0 && (
+                            <p className="text-sm text-cyan-600">
+                              Vault: {vaultBal1.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground/80">
+                          ≈ $
+                          {usd1.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                          {pct1.toFixed(1)}%
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-3 text-muted-foreground">—</p>
+                  )}
+
+                  <a
+                    href={`https://basescan.org/token/${token1}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 flex items-center gap-1 break-all font-mono text-xs text-muted-foreground/70 hover:text-primary hover:underline"
+                    title={token1}
+                  >
+                    {token1}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="shrink-0"
+                    >
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </a>
+                  {address && (
+                    <TokenCardActions
+                      token={{ address: token1 as `0x${string}`, symbol: sym1, decimals: dec1 }}
+                      counter={{ address: token2 as `0x${string}`, symbol: sym2, decimals: dec2 }}
+                      vault={vaultAddress}
+                      fromPrice={p1}
+                      toPrice={p2}
+                      onChange={refetchVault}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* ---- Token 2 card ---- */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <TokenLogo src={logo2} symbol={sym2} />
+                    <div>
+                      <p className="font-medium text-foreground">{sym2}</p>
+                      <p className="text-lg font-semibold text-foreground">
+                        ${p2.toFixed(p2 >= 1 ? 2 : 6)}
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <PriceChangeBadge label="1h" value={meta2?.priceChange1h} />
+                        <PriceChangeBadge label="24h" value={meta2?.priceChange24h} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {address ? (
+                    <>
+                      {isWeth2 ? (
+                        <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+                          <p>ETH: {nativeEth.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
+                          <p>WETH: {bal2Num.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
+                          {vaultBal2 > 0 && (
+                            <p className="text-cyan-600">
+                              Vault: {vaultBal2.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mt-3 space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            Wallet: {bal2Num.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                          </p>
+                          {vaultBal2 > 0 && (
+                            <p className="text-sm text-cyan-600">
+                              Vault: {vaultBal2.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground/80">
+                          ≈ $
+                          {usd2.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                          {pct2.toFixed(1)}%
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-3 text-muted-foreground">—</p>
+                  )}
+
+                  <a
+                    href={`https://basescan.org/token/${token2}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 flex items-center gap-1 break-all font-mono text-xs text-muted-foreground/70 hover:text-primary hover:underline"
+                    title={token2}
+                  >
+                    {token2}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="shrink-0"
+                    >
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </a>
+                  {address && (
+                    <TokenCardActions
+                      token={{ address: token2 as `0x${string}`, symbol: sym2, decimals: dec2 }}
+                      counter={{ address: token1 as `0x${string}`, symbol: sym1, decimals: dec1 }}
+                      vault={vaultAddress}
+                      fromPrice={p2}
+                      toPrice={p1}
+                      onChange={refetchVault}
+                    />
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
-            {/* ---- Token 2 card ---- */}
-            <div className="rounded-lg border border-white/10 bg-black/30 p-4">
-              <div className="flex items-center gap-3">
-                <TokenLogo src={logo2} symbol={sym2} />
-                <div>
-                  <p className="font-medium text-white">{sym2}</p>
-                  <p className="text-lg font-semibold text-white">
-                    ${p2.toFixed(p2 >= 1 ? 2 : 6)}
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <PriceChangeBadge label="1h" value={meta2?.priceChange1h} />
-                    <PriceChangeBadge label="24h" value={meta2?.priceChange24h} />
-                  </div>
+            {/* Allocation bar */}
+            {address && totalUsd > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {sym1} — {pct1.toFixed(1)}%
+                  </span>
+                  <span>
+                    Total: $
+                    {totalUsd.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                  <span>
+                    {pct2.toFixed(1)}% — {sym2}
+                  </span>
+                </div>
+                <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="bg-primary transition-all duration-500"
+                    style={{ width: `${pct1}%` }}
+                  />
+                  <div
+                    className="bg-[#d48beb] transition-all duration-500"
+                    style={{ width: `${pct2}%` }}
+                  />
                 </div>
               </div>
+            )}
 
-              {address ? (
-                <>
-                  {isWeth2 ? (
-                    <div className="mt-3 space-y-1 text-sm text-white/70">
-                      <p>ETH: {nativeEth.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
-                      <p>WETH: {bal2Num.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
-                      {vaultBal2 > 0 && (
-                        <p className="text-cyan-400/80">
-                          Vault: {vaultBal2.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="mt-3 space-y-1">
-                      <p className="text-sm text-white/70">
-                        Wallet: {bal2Num.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                      </p>
-                      {vaultBal2 > 0 && (
-                        <p className="text-sm text-cyan-400/80">
-                          Vault: {vaultBal2.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-white/80">
-                      ≈ $
-                      {usd2.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-white/60">
-                      {pct2.toFixed(1)}%
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <p className="mt-3 text-white/50">—</p>
-              )}
+            {/* Price chart */}
+            <PriceChart token1={token1} token2={token2} symbol1={sym1} symbol2={sym2} />
 
-              <a
-                href={`https://basescan.org/token/${token2}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 flex items-center gap-1 break-all font-mono text-xs text-white/40 hover:text-[#0052FF] hover:underline"
-                title={token2}
-              >
-                {token2}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="shrink-0"
-                >
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-              </a>
-            </div>
+            {/* WETH warning — moved to bottom of the pair block */}
+            {hasWethInPair && (
+              <Alert className="border-amber-200 bg-amber-50">
+                <AlertDescription className="text-sm text-amber-600">
+                  For swapping you need <strong>WETH</strong>. If you only have
+                  ETH — it will be wrapped to WETH when you tap Rebalance.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Allocation bar */}
-          {address && totalUsd > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs text-white/50">
-                <span>
-                  {sym1} — {pct1.toFixed(1)}%
-                </span>
-                <span>
-                  Total: $
-                  {totalUsd.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-                <span>
-                  {pct2.toFixed(1)}% — {sym2}
-                </span>
-              </div>
-              <div className="flex h-2 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="bg-[#0052FF] transition-all duration-500"
-                  style={{ width: `${pct1}%` }}
-                />
-                <div
-                  className="bg-[#d48beb] transition-all duration-500"
-                  style={{ width: `${pct2}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Price chart */}
-          <PriceChart token1={token1} token2={token2} symbol1={sym1} symbol2={sym2} />
-
-          {/* WETH warning — moved to bottom of the pair block */}
-          {hasWethInPair && (
-            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-              For swapping you need <strong>WETH</strong>. If you only have
-              ETH — it will be wrapped to WETH when you tap Rebalance.
-            </p>
-          )}
-        </div>
-      </div>
+      <PairAnalytics token1={token1} token2={token2} sym1={sym1} sym2={sym2} />
 
       <AiAdvisor
         token1={token1}
@@ -419,18 +453,6 @@ export function PairDashboard({ token1, token2, onBack }: PairDashboardProps) {
         onTriggersCreated={() => {
           queryClient.invalidateQueries({ queryKey: ["triggers", address, sortedPairId] });
         }}
-      />
-
-      <VaultPanel
-        token1={token1}
-        token2={token2}
-        sym1={sym1}
-        sym2={sym2}
-        dec1={dec1}
-        dec2={dec2}
-        parentVaultBal1={vaultBal1Raw}
-        parentVaultBal2={vaultBal2Raw}
-        onVaultChange={refetchVault}
       />
 
       <TriggerForm
@@ -450,17 +472,6 @@ export function PairDashboard({ token1, token2, onBack }: PairDashboardProps) {
         direction={direction}
         onDirectionChange={setDirection}
         fromBalance={direction === "1to2" ? vaultBal1 : vaultBal2}
-      />
-
-      <ManualRebalance
-        fromToken={fromToken}
-        toToken={toToken}
-        fromSym={fromSym}
-        toSym={toSym}
-        fromPrice={direction === "1to2" ? p1 : p2}
-        toPrice={direction === "1to2" ? p2 : p1}
-        fromDecimals={direction === "1to2" ? dec1 : dec2}
-        toDecimals={direction === "1to2" ? dec2 : dec1}
       />
     </div>
   );

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     log.error("ai_recommend", "Recommendation failed", { error: String(err) });
     return NextResponse.json(
       { error: "AI recommendation failed", detail: String(err) },
-      { status: 502 }
+      { status: 500 }
     );
   }
 }

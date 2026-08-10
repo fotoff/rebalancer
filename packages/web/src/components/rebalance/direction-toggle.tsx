@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
 type DirectionToggleProps = {
   fromSym: string;
   toSym: string;
@@ -21,10 +23,10 @@ export function DirectionToggle({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <button
+      <Button
         type="button"
         onClick={toggle}
-        className="flex items-center gap-2 rounded-lg bg-[#0052FF] px-4 py-2.5 font-medium text-white transition hover:bg-[#0046e0]"
+        className="flex items-center gap-2 px-4 py-2.5 font-medium"
       >
         <span>
           {fromSym} → {toSym}
@@ -43,11 +45,11 @@ export function DirectionToggle({
         >
           <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
         </svg>
-      </button>
+      </Button>
 
-      <div className="text-sm text-white/60">
+      <div className="text-sm text-muted-foreground">
         1 {fromSym} ={" "}
-        <span className="font-semibold text-white">
+        <span className="font-semibold text-foreground">
           {displayRatio.toLocaleString(undefined, { maximumFractionDigits: 4 })}
         </span>{" "}
         {toSym}

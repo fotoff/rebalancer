@@ -9,10 +9,10 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { useAccount, useReadContracts } from "wagmi";
+import { useReadContracts } from "wagmi";
+import { erc20Abi } from "viem";
 import { keepPreviousData } from "@tanstack/react-query";
-import { VAULT_ABI } from "@/lib/vault-abi";
-import { REBALANCER_VAULT_ADDRESS } from "@/lib/constants";
+import { useUserVault } from "./use-user-vault";
 
 // ── Types ──────────────────────────────────────────────────
 type VaultBalancesContextValue = {
@@ -32,12 +32,12 @@ const VaultBalancesContext = createContext<VaultBalancesContextValue>({
 
 // ── Provider ───────────────────────────────────────────────
 export function VaultBalancesProvider({ children }: { children: ReactNode }) {
-  const { address } = useAccount();
+  // The single source of truth is now the user's personal non-custodial vault.
+  // Its balance of a token is simply erc20.balanceOf(vaultAddress).
+  const { vaultAddress } = useUserVault();
   const [tokenSet, setTokenSet] = useState<Set<string>>(new Set());
 
-  const vaultAddr = REBALANCER_VAULT_ADDRESS as `0x${string}`;
-  const hasVault =
-    vaultAddr !== "0x0000000000000000000000000000000000000000";
+  const hasVault = Boolean(vaultAddress);
 
   // Components call this to register which tokens they need
   const registerTokens = useCallback((addrs: string[]) => {
@@ -61,18 +61,16 @@ export function VaultBalancesProvider({ children }: { children: ReactNode }) {
     [tokenSet]
   );
 
-  // Single useReadContracts for ALL vault balances
+  // Single useReadContracts for ALL vault balances: balanceOf(vault) per token.
   const { data, refetch } = useReadContracts({
     contracts: sortedTokens.map((addr) => ({
-      address: vaultAddr,
-      abi: VAULT_ABI,
-      functionName: "balances" as const,
-      args: address
-        ? [address as `0x${string}`, addr as `0x${string}`]
-        : undefined,
+      address: addr as `0x${string}`,
+      abi: erc20Abi,
+      functionName: "balanceOf" as const,
+      args: vaultAddress ? [vaultAddress] : undefined,
     })),
     query: {
-      enabled: !!address && hasVault && sortedTokens.length > 0,
+      enabled: hasVault && sortedTokens.length > 0,
       placeholderData: keepPreviousData,
       refetchInterval: 30_000,
     },

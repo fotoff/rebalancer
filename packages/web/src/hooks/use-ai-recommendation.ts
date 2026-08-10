@@ -101,6 +101,17 @@ export function useAiRecommendation() {
 
         const data: AiRecommendation = await resp.json();
         setRecommendation(data);
+        // Persist per-pair so the card can show the last analysis instantly on reopen.
+        if (params.pairId) {
+          try {
+            localStorage.setItem(
+              `ai-rec-${params.pairId}`,
+              JSON.stringify({ ts: Date.now(), data })
+            );
+          } catch {
+            // ignore quota errors
+          }
+        }
         return data;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -174,12 +185,27 @@ export function useAiRecommendation() {
     []
   );
 
+  // Load a previously persisted recommendation for a pair. Returns its age (ms)
+  // so the UI can flag it as possibly outdated, or null if there's no cache.
+  const loadCached = useCallback((pairId: string): number | null => {
+    try {
+      const raw = localStorage.getItem(`ai-rec-${pairId}`);
+      if (!raw) return null;
+      const { ts, data } = JSON.parse(raw) as { ts: number; data: AiRecommendation };
+      setRecommendation(data);
+      return Date.now() - ts;
+    } catch {
+      return null;
+    }
+  }, []);
+
   return {
     recommendation,
     loading,
     error,
     fetchRecommendation,
     createSuggestedTriggers,
+    loadCached,
     clearRecommendation: () => setRecommendation(null),
   };
 }

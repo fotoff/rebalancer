@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     log.error("ai_validate", "Validation failed", { error: String(err) });
     return NextResponse.json(
       { error: "AI validation failed", detail: String(err) },
-      { status: 502 }
+      { status: 500 }
     );
   }
 }

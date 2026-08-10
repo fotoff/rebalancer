@@ -55,3 +55,6 @@ packages/ai-advisor/
 
 # Lock files (keep package-lock.json for reproducibility)
 # package-lock.json
+
+# TS incremental build cache
+*.tsbuildinfo

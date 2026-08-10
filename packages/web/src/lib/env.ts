@@ -17,8 +17,8 @@ const serverEnvSchema = z.object({
     .string()
     .min(32, "INTERNAL_API_KEY must be at least 32 characters"),
 
-  // Public (available in browser)
-  NEXT_PUBLIC_VAULT_ADDRESS: ethAddress,
+  // Public (available in browser) — the non-custodial factory address
+  NEXT_PUBLIC_FACTORY_ADDRESS: ethAddress,
 
   // Optional with defaults
   BASE_RPC_URL: z.string().url().optional().default("https://mainnet.base.org"),

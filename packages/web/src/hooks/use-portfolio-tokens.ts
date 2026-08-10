@@ -9,6 +9,56 @@ import { TOKENS } from "@/lib/constants";
 import { useTokenPrices } from "./use-token-prices";
 
 const HIDDEN_KEY = "rebalancer-hidden-tokens";
+const SCAN_CACHE_KEY = "rebalancer-scan-cache";
+const SCAN_CACHE_TTL = 24 * 60 * 60 * 1000; // keep last scan for a day
+
+export type FilteredToken = {
+  address: string;
+  symbol: string;
+  balanceFormatted: number;
+  decimals: number;
+  reason: "spam" | "scam" | "low_liquidity";
+  liquidityUsd?: number;
+  priceUsd?: number;
+};
+
+type ScanResult = {
+  tokens: Array<{
+    address: string;
+    balanceFormatted: number;
+    decimals: number;
+    symbol: string;
+  }>;
+  scannedCount: number;
+  filteredCount: number;
+  hidden: FilteredToken[];
+  error: string | null;
+};
+
+function readScanCache(addr: string | undefined): ScanResult | undefined {
+  if (!addr) return undefined;
+  try {
+    const raw = localStorage.getItem(SCAN_CACHE_KEY);
+    if (!raw) return undefined;
+    const all = JSON.parse(raw) as Record<string, { ts: number; data: ScanResult }>;
+    const entry = all[addr.toLowerCase()];
+    if (!entry || Date.now() - entry.ts > SCAN_CACHE_TTL) return undefined;
+    return entry.data;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeScanCache(addr: string, data: ScanResult) {
+  try {
+    const raw = localStorage.getItem(SCAN_CACHE_KEY);
+    const all = raw ? (JSON.parse(raw) as Record<string, { ts: number; data: ScanResult }>) : {};
+    all[addr.toLowerCase()] = { ts: Date.now(), data };
+    localStorage.setItem(SCAN_CACHE_KEY, JSON.stringify(all));
+  } catch {
+    // ignore quota / serialization errors
+  }
+}
 
 export type PortfolioItem = {
   address: string; // "native" for ETH, else contract address
@@ -64,26 +114,43 @@ export function usePortfolioTokens() {
     chainId: base.id,
   });
 
-  const { data: scanData } = useQuery({
+  const {
+    data: scanData,
+    isLoading: scanLoading,
+    isFetching: scanFetching,
+    isError: scanIsError,
+    refetch: refetchScan,
+  } = useQuery({
     queryKey: ["portfolio-scan", address],
-    queryFn: async () => {
+    queryFn: async (): Promise<ScanResult> => {
       const res = await fetch(
         `/api/portfolio/scan?address=${encodeURIComponent(address ?? "")}`
       );
       const data = await res.json();
-      return data.tokens ?? [];
+      const result: ScanResult = {
+        tokens: data.tokens ?? [],
+        scannedCount: (data.scannedCount ?? 0) as number,
+        filteredCount: (data.filteredCount ?? 0) as number,
+        hidden: (data.hidden ?? []) as FilteredToken[],
+        error: (data.error ?? null) as string | null,
+      };
+      if (address && !result.error) writeScanCache(address, result);
+      return result;
     },
     enabled: !!address,
     staleTime: 60_000,
+    // Seed from the last persisted scan so a page refresh shows the previous
+    // result instantly instead of an empty table, while it refetches.
+    initialData: () => readScanCache(address),
+    initialDataUpdatedAt: 0,
     placeholderData: keepPreviousData,
   });
 
-  const scannedTokens = (scanData ?? []) as Array<{
-    address: string;
-    balanceFormatted: number;
-    decimals: number;
-    symbol: string;
-  }>;
+  const scannedTokens = scanData?.tokens ?? [];
+  const scannedCount = scanData?.scannedCount ?? 0;
+  const filteredCount = scanData?.filteredCount ?? 0;
+  const filteredTokens = scanData?.hidden ?? [];
+  const scanError = scanIsError || Boolean(scanData?.error);
 
   const useScan = scannedTokens.length > 0;
 
@@ -218,6 +285,14 @@ export function usePortfolioTokens() {
     hiddenSet,
     toggleHidden,
     showAllHidden,
+    // Transparency: scan lifecycle + how many tokens the auto-filter hid.
+    isLoading: scanLoading,
+    isFetching: scanFetching,
+    isError: scanError,
+    refetch: refetchScan,
+    scannedCount,
+    filteredCount,
+    filteredTokens,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     totalUsd: useMemo(() => visibleItems.reduce((s, i) => s + i.usdValue, 0), [visibleItems]),
   };

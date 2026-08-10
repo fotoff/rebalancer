@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkScamBatch } from "@/lib/scam-check";
+import { fetchTokenLiquidity } from "@/lib/token-liquidity";
+
+// Liquidity gate: hide tokens with no real DEX pool, and guard against a
+// fabricated price set by a microscopic pool (value >> pool liquidity).
+const MIN_LIQUIDITY_USD = 5_000;
+const MAX_VALUE_TO_LIQUIDITY = 200;
 
 // Alchemy: returns all ERC20 token balances for an address on Base
 // Requires ALCHEMY_API_KEY in env (free tier at alchemy.com)
@@ -17,6 +23,7 @@ export type ScannedToken = {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const walletAddress = searchParams.get("address")?.trim();
+  const raw = searchParams.get("raw") === "1";
   if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
     return NextResponse.json(
       { error: "Missing or invalid address" },
@@ -95,7 +102,7 @@ export async function GET(request: NextRequest) {
     );
 
     if (withBalance.length === 0) {
-      return NextResponse.json({ tokens: [] });
+      return NextResponse.json({ tokens: [], scannedCount: 0, filteredCount: 0 });
     }
 
     const KNOWN: Record<string, { symbol: string; decimals: number }> = {
@@ -189,6 +196,43 @@ export async function GET(request: NextRequest) {
       return SPAM_PATTERNS.some((p) => p.test(symbol));
     }
 
+    const fmtBalance = (raw: string, decimals: number) =>
+      Number((Number(BigInt(raw)) / 10 ** decimals).toPrecision(12));
+
+    // Raw mode: return EVERY non-zero balance with metadata, no scam/liquidity
+    // filtering. Used to enumerate a user's own vault holdings — we must never
+    // hide what they deposited themselves.
+    if (raw) {
+      const rawTokens: ScannedToken[] = withBalance.map((t) => {
+        const addr = t.contractAddress.toLowerCase();
+        const meta = KNOWN[addr] ?? metadataMap[addr] ?? { symbol: "???", decimals: 18 };
+        return {
+          address: t.contractAddress,
+          balance: t.tokenBalance,
+          balanceFormatted: fmtBalance(t.tokenBalance, meta.decimals),
+          decimals: meta.decimals,
+          symbol: meta.symbol,
+        };
+      });
+      return NextResponse.json({
+        tokens: rawTokens,
+        scannedCount: withBalance.length,
+        filteredCount: 0,
+        hidden: [],
+      });
+    }
+
+    // Hidden tokens we surface back to the client so the user can inspect them.
+    const hidden: Array<{
+      address: string;
+      symbol: string;
+      balanceFormatted: number;
+      decimals: number;
+      reason: "spam" | "scam" | "low_liquidity";
+      liquidityUsd?: number;
+      priceUsd?: number;
+    }> = [];
+
     // Build candidate list (after symbol spam filter)
     const candidates: Array<{
       contractAddress: string;
@@ -198,7 +242,10 @@ export async function GET(request: NextRequest) {
     for (const t of withBalance) {
       const addr = t.contractAddress.toLowerCase();
       const meta = KNOWN[addr] ?? metadataMap[addr] ?? { symbol: "???", decimals: 18 };
-      if (isSpam(meta.symbol)) continue;
+      if (isSpam(meta.symbol)) {
+        hidden.push({ address: t.contractAddress, symbol: meta.symbol, balanceFormatted: fmtBalance(t.tokenBalance, meta.decimals), decimals: meta.decimals, reason: "spam" });
+        continue;
+      }
       candidates.push({ contractAddress: t.contractAddress, tokenBalance: t.tokenBalance, meta });
     }
 
@@ -209,16 +256,42 @@ export async function GET(request: NextRequest) {
       .filter((addr) => !knownSafe.has(addr));
     const scamMap = toCheck.length > 0 ? await checkScamBatch(toCheck, "8453") : new Map<string, boolean>();
 
+    // Liquidity gate: a real token trades in a real pool. Look up the best
+    // (max-liquidity) DEX pair for every non-known candidate.
+    const { map: liqMap, ok: liqOk } = await fetchTokenLiquidity(toCheck);
+
     const tokens: ScannedToken[] = [];
     for (const t of candidates) {
       const addr = t.contractAddress.toLowerCase();
-      if (scamMap.get(addr)) continue;
+      const balanceFormatted = fmtBalance(t.tokenBalance, t.meta.decimals);
 
-      const balanceBig = BigInt(t.tokenBalance);
-      const balanceFormatted = Number(
-        (Number(balanceBig) / 10 ** t.meta.decimals).toPrecision(12)
-      );
+      if (scamMap.get(addr)) {
+        hidden.push({ address: t.contractAddress, symbol: t.meta.symbol, balanceFormatted, decimals: t.meta.decimals, reason: "scam" });
+        continue;
+      }
       if (balanceFormatted <= 0) continue;
+
+      const isKnown = knownSafe.has(addr);
+      // Apply the liquidity gate only to unknown tokens, and only when the
+      // DexScreener lookup actually succeeded (don't hide everything on outage).
+      if (!isKnown && liqOk) {
+        const liq = liqMap.get(addr);
+        const valueUsd = liq ? balanceFormatted * liq.priceUsd : 0;
+        const lowLiq = !liq || liq.liquidityUsd < MIN_LIQUIDITY_USD;
+        const fabricated = liq && valueUsd > liq.liquidityUsd * MAX_VALUE_TO_LIQUIDITY;
+        if (lowLiq || fabricated) {
+          hidden.push({
+            address: t.contractAddress,
+            symbol: t.meta.symbol,
+            balanceFormatted,
+            decimals: t.meta.decimals,
+            reason: "low_liquidity",
+            liquidityUsd: liq?.liquidityUsd ?? 0,
+            priceUsd: liq?.priceUsd ?? 0,
+          });
+          continue;
+        }
+      }
 
       tokens.push({
         address: t.contractAddress,
@@ -229,11 +302,20 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ tokens });
+    // scannedCount = ERC20s with a non-zero balance; filteredCount = how many of
+    // those were auto-hidden (spam symbol / scam / no real liquidity).
+    // Sort hidden by descending balance and cap to keep the payload reasonable.
+    hidden.sort((a, b) => b.balanceFormatted - a.balanceFormatted);
+    return NextResponse.json({
+      tokens,
+      scannedCount: withBalance.length,
+      filteredCount: Math.max(0, withBalance.length - tokens.length),
+      hidden: hidden.slice(0, 500),
+    });
   } catch (e) {
     console.error("Portfolio scan error:", e);
     return NextResponse.json(
-      { error: "Scan failed", tokens: [] },
+      { error: "Scan failed", tokens: [], scannedCount: 0, filteredCount: 0 },
       { status: 200 }
     );
   }

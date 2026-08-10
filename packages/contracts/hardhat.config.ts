@@ -14,7 +14,12 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    hardhat: {},
+    // Set FORK=1 to fork Base mainnet in-process (validates deploy against real
+    // Chainlink feeds / routers before spending real ETH). Requires BASE_RPC_URL.
+    hardhat:
+      process.env.FORK === "1"
+        ? { forking: { url: process.env.BASE_RPC_URL || "https://mainnet.base.org" }, chainId: 8453 }
+        : {},
     base: {
       url: process.env.BASE_RPC_URL || "https://mainnet.base.org",
       chainId: 8453,

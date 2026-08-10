@@ -11,8 +11,8 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     log.error("ai_suggest_pairs", "Suggest pairs failed", { error: String(err) });
     return NextResponse.json(
-      { error: "AI suggest-pairs failed", detail: String(err) },
-      { status: 502 }
+      { error: "AI suggest-pairs failed", detail: String(err), pairs: [] },
+      { status: 200 }
     );
   }
 }

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { TokenSelector } from "./token-selector";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 type PairCreatorProps = {
   suggestedToken?: string | null;
@@ -35,42 +37,44 @@ export function PairCreator({
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-      <h2 className="mb-4 text-lg font-semibold text-white">
-        Create pair for tracking
-      </h2>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <label className="mb-2 block text-sm text-white/60">
-            Token 1 (sell)
-          </label>
-          <TokenSelector
-            value={token1}
-            onChange={setToken1}
-            excludeAddress={token2 ?? undefined}
-          />
+    <Card>
+      <CardContent className="p-5">
+        <h2 className="mb-4 text-lg font-semibold text-foreground">
+          Create pair for tracking
+        </h2>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label className="mb-2 block text-sm text-muted-foreground">
+              Token 1 (sell)
+            </label>
+            <TokenSelector
+              value={token1}
+              onChange={setToken1}
+              excludeAddress={token2 ?? undefined}
+            />
+          </div>
+          <div className="flex items-center justify-center text-2xl text-muted-foreground">
+            ⟷
+          </div>
+          <div className="flex-1">
+            <label className="mb-2 block text-sm text-muted-foreground">
+              Token 2 (buy)
+            </label>
+            <TokenSelector
+              value={token2}
+              onChange={setToken2}
+              excludeAddress={token1 ?? undefined}
+            />
+          </div>
         </div>
-        <div className="flex items-center justify-center text-2xl text-white/40">
-          ⟷
-        </div>
-        <div className="flex-1">
-          <label className="mb-2 block text-sm text-white/60">
-            Token 2 (buy)
-          </label>
-          <TokenSelector
-            value={token2}
-            onChange={setToken2}
-            excludeAddress={token1 ?? undefined}
-          />
-        </div>
-      </div>
-      <button
-        onClick={handleCreate}
-        disabled={!token1 || !token2 || token1 === token2}
-        className="mt-4 rounded-lg bg-[#0052FF] px-6 py-2 font-medium text-white transition hover:bg-[#0046e0] disabled:opacity-50 disabled:hover:bg-[#0052FF]"
-      >
-        Create pair
-      </button>
-    </div>
+        <Button
+          onClick={handleCreate}
+          disabled={!token1 || !token2 || token1 === token2}
+          className="mt-4"
+        >
+          Create pair
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

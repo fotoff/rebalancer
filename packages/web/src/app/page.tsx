@@ -4,14 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useAccount } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Header } from "@/components/header";
 import { Landing } from "@/components/landing";
 import { PortfolioList } from "@/components/portfolio/portfolio-list";
+import { NonCustodialVault } from "@/components/vault/noncustodial-vault";
 import { PairSuggestions } from "@/components/pairs/pair-suggestions";
 import { PairCreator } from "@/components/pairs/pair-creator";
 import { SavedPairs } from "@/components/pairs/saved-pairs";
 import { VaultBalancesProvider } from "@/hooks/use-vault-balances";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const PairDashboard = dynamic(
   () =>
@@ -21,8 +22,8 @@ const PairDashboard = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="rounded-xl border border-white/10 bg-white/5 p-12 text-center">
-        <div className="text-white/50">Loading...</div>
+      <div className="rounded-xl border border-border bg-card p-12 text-center">
+        <Skeleton className="mx-auto h-4 w-24" />
       </div>
     ),
   }
@@ -79,9 +80,9 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <Header />
-      <main className="mx-auto max-w-4xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-8">
         {pair ? (
           <VaultBalancesProvider>
             <PairDashboard
@@ -93,6 +94,7 @@ export default function Home() {
         ) : (
           <VaultBalancesProvider>
             <div className="space-y-8">
+              <NonCustodialVault />
               <PortfolioList onAddToPair={handleAddToPair} />
               <PairSuggestions onCreatePair={handlePairCreated} />
               <SavedPairs onSelectPair={handleSelectPair} />
@@ -107,54 +109,59 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="mx-auto max-w-4xl px-4 pb-8 pt-12">
-        <div className="border-t border-white/10 pt-6">
+      <footer className="mx-auto max-w-6xl px-4 pb-8 pt-12">
+        <div className="border-t border-border pt-6">
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/30">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span>&copy; Rebalancer 2026</span>
-              <span className="hidden sm:inline">·</span>
+              <span className="hidden sm:inline">&middot;</span>
               <span>v2.0 closed beta</span>
-              <span className="hidden sm:inline">·</span>
+              <span className="hidden sm:inline">&middot;</span>
               <span>
                 Powered by{" "}
                 <a
                   href="https://li.fi"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-white/50 hover:text-white/80 hover:underline"
+                  className="text-foreground/60 hover:text-foreground hover:underline"
                 >
                   LI.FI
                 </a>
               </span>
             </div>
-            <div className="flex items-center gap-3 text-xs text-white/30">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <a
                 href="https://github.com/fotoff/rebalancer"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-white/50"
+                className="hover:text-foreground"
               >
                 GitHub
               </a>
-              <span>·</span>
+              <span>&middot;</span>
+              <a href="/stats" className="hover:text-foreground">
+                Stats
+              </a>
+              <span>&middot;</span>
               <a
-                href={`https://basescan.org/address/${process.env.NEXT_PUBLIC_VAULT_ADDRESS ?? ""}`}
+                href={`https://basescan.org/address/${process.env.NEXT_PUBLIC_FACTORY_ADDRESS ?? ""}#code`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-white/50"
+                className="hover:text-foreground"
               >
-                Vault on BaseScan
+                Factory on BaseScan
               </a>
-              <span>·</span>
+              <span>&middot;</span>
               <span className="flex items-center gap-1">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 Base Mainnet
               </span>
             </div>
           </div>
-          <p className="mt-3 text-center text-[10px] text-white/20">
+          <p className="mt-3 text-center text-[10px] text-muted-foreground/70">
             Rebalancer is not financial advice. Use at your own risk.
-            Smart contracts have not been audited.
+            Smart contracts are covered by automated tests; an independent audit
+            is pending.
           </p>
         </div>
       </footer>

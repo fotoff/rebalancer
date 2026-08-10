@@ -45,7 +45,6 @@ export function TokenSelector({
   const { address } = useAccount();
   const { items: portfolioItems } = usePortfolioTokens();
 
-  // Read symbol/decimals from contract for all known options + selected token
   const infoAddrs = useMemo(
     () => [...OPTIONS, ...(value ? [value] : [])],
     [value]
@@ -209,19 +208,19 @@ export function TokenSelector({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-left text-white hover:border-white/40"
+        className="flex w-full items-center justify-between rounded-lg border border-input bg-background px-4 py-3 text-left text-foreground shadow-sm hover:border-primary/50 transition"
       >
         <span>
           {selectedSymbol ?? "Select token"}
           {address && selectedBalance != null && selectedBalance > 0 && (
-            <span className="ml-2 text-sm font-normal text-white/50">
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
               {selectedBalance.toLocaleString(undefined, {
                 maximumFractionDigits: 4,
               })}
             </span>
           )}
         </span>
-        <span className="text-white/50">▼</span>
+        <span className="text-muted-foreground">▼</span>
       </button>
 
       {open && (
@@ -231,17 +230,17 @@ export function TokenSelector({
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-60 overflow-auto rounded-lg border border-white/20 bg-[#0a0a0a]">
+          <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-60 overflow-auto rounded-lg border border-border bg-popover shadow-lg">
             <input
               type="text"
               placeholder="Symbol or address (0x...)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full border-b border-white/10 bg-transparent px-4 py-2 text-white placeholder:text-white/40"
+              className="w-full border-b border-border bg-transparent px-4 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
             {portfolioFiltered.length > 0 && (
               <>
-                <div className="px-4 py-2 text-xs font-medium text-white/40">
+                <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
                   My portfolio
                 </div>
                 {portfolioFiltered.map((p) => (
@@ -252,16 +251,16 @@ export function TokenSelector({
                         onChange(p.tokenAddress);
                         setOpen(false);
                       }}
-                      className="flex w-full items-center justify-between px-4 py-2 text-left text-white hover:bg-white/10"
+                      className="flex w-full items-center justify-between px-4 py-2 text-left text-foreground hover:bg-accent transition"
                     >
                       <span>
                         {p.symbol}{" "}
-                        <span className="text-white/40">
+                        <span className="text-muted-foreground">
                           {shortAddr(p.tokenAddress)}
                         </span>
                       </span>
                       {address && (
-                        <span className="text-sm text-white/50">
+                        <span className="text-sm text-muted-foreground">
                           {p.balance.toLocaleString(undefined, {
                             maximumFractionDigits: 4,
                           })}
@@ -281,16 +280,16 @@ export function TokenSelector({
                     onChange(customToken!.addr);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center justify-between px-4 py-2 text-left text-white hover:bg-white/10"
+                  className="flex w-full items-center justify-between px-4 py-2 text-left text-foreground hover:bg-accent transition"
                 >
                   <span>
                     {customToken!.symbol || "Token"}{" "}
-                    <span className="text-white/40">
+                    <span className="text-muted-foreground">
                       {shortAddr(customToken!.addr)}
                     </span>
                   </span>
                   {address && (
-                    <span className="text-sm text-white/50">
+                    <span className="text-sm text-muted-foreground">
                       {bal.toLocaleString(undefined, {
                         maximumFractionDigits: 4,
                       })}
@@ -315,14 +314,14 @@ export function TokenSelector({
                     onChange(addr);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center justify-between px-4 py-2 text-left text-white hover:bg-white/10"
+                  className="flex w-full items-center justify-between px-4 py-2 text-left text-foreground hover:bg-accent transition"
                 >
                   <span>
                     {getTokenSymbol(addr)}{" "}
-                    <span className="text-white/40">{shortAddr(addr)}</span>
+                    <span className="text-muted-foreground">{shortAddr(addr)}</span>
                   </span>
                   {address && (
-                    <span className="text-sm text-white/50">
+                    <span className="text-sm text-muted-foreground">
                       {Number(balStr).toLocaleString(undefined, {
                         maximumFractionDigits: 4,
                       })}
@@ -350,27 +349,27 @@ export function TokenSelector({
                     onChange(t.address);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center justify-between px-4 py-2 text-left text-white hover:bg-white/10"
+                  className="flex w-full items-center justify-between px-4 py-2 text-left text-foreground hover:bg-accent transition"
                 >
                   <span>
                     {t.symbol}{" "}
-                    <span className="text-white/40">{shortAddr(t.address)}</span>
+                    <span className="text-muted-foreground">{shortAddr(t.address)}</span>
                   </span>
                   <span className="flex items-center gap-2">
                     {address && (
-                      <span className="text-sm text-white/50">
+                      <span className="text-sm text-muted-foreground">
                         {Number(balStr).toLocaleString(undefined, {
                           maximumFractionDigits: 4,
                         })}
                       </span>
                     )}
-                    <span className="text-xs text-white/40">Base</span>
+                    <span className="text-xs text-muted-foreground">Base</span>
                   </span>
                 </button>
               );
             })}
             {!hasResults && (
-              <div className="px-4 py-6 text-center text-white/50">
+              <div className="px-4 py-6 text-center text-muted-foreground">
                 {search.length < 2
                   ? "Enter at least 2 characters"
                   : isFetching

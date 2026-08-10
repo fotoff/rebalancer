@@ -13,8 +13,13 @@ import {
 import { parseUnits, formatUnits } from "viem";
 import { erc20Abi } from "viem";
 import { base } from "viem/chains";
-import { TOKENS, REBALANCER_VAULT_ADDRESS } from "@/lib/constants";
-import { VAULT_ABI } from "@/lib/vault-abi";
+import { TOKENS } from "@/lib/constants";
+import { useVaultBalances } from "@/hooks/use-vault-balances";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const WETH_ABI = [
   {
@@ -35,6 +40,8 @@ type ManualRebalanceProps = {
   toPrice: number;
   fromDecimals: number;
   toDecimals: number;
+  /** When true, render without the outer Card/title (for embedding in a token card). */
+  compact?: boolean;
 };
 
 type LiFiQuote = {
@@ -60,6 +67,7 @@ export function ManualRebalance({
   toPrice,
   fromDecimals,
   toDecimals,
+  compact = false,
 }: ManualRebalanceProps) {
   const [amount, setAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -133,7 +141,7 @@ export function ManualRebalance({
       if (msg.includes("No available quotes")) {
         setError("No routes available for this token pair.");
       } else {
-        setError(msg.length > 200 ? msg.slice(0, 200) + "…" : msg);
+        setError(msg.length > 200 ? msg.slice(0, 200) + "..." : msg);
       }
     } finally {
       setQuoteLoading(false);
@@ -187,16 +195,10 @@ export function ManualRebalance({
   const walletBalance = (walletBalanceRaw as bigint | undefined) ?? 0n;
   const walletBalanceNum = Number(formatUnits(walletBalance, fromDecimals));
 
-  // Vault balance of fromToken (to show warning)
-  const vaultAddr = REBALANCER_VAULT_ADDRESS as `0x${string}`;
-  const { data: vaultBalanceRaw } = useReadContract({
-    address: vaultAddr,
-    abi: VAULT_ABI,
-    functionName: "balances",
-    args: address ? [address, fromToken as `0x${string}`] : undefined,
-    query: { enabled: !!address },
-  });
-  const vaultBalance = (vaultBalanceRaw as bigint | undefined) ?? 0n;
+  // Personal (non-custodial) vault balance of fromToken — shown as a hint that
+  // the user also holds this token inside their vault.
+  const { vaultBalances } = useVaultBalances([fromToken]);
+  const vaultBalance = vaultBalances[fromToken.toLowerCase()] ?? 0n;
   const vaultBalanceNum = Number(formatUnits(vaultBalance, fromDecimals));
 
   const insufficientWallet = amountInWei > 0n && walletBalance < amountInWei;
@@ -291,7 +293,7 @@ export function ManualRebalance({
         setError("Approval needed — try again");
       } else {
         setError(
-          msg.length > 200 ? msg.slice(0, 200) + "…" : msg
+          msg.length > 200 ? msg.slice(0, 200) + "..." : msg
         );
       }
     } finally {
@@ -309,46 +311,43 @@ export function ManualRebalance({
     swapping ||
     (insufficientWallet && !needsWrap);
 
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-      <h3 className="mb-4 text-lg font-semibold text-white">
-        Manual rebalance
-      </h3>
-      <p className="mb-2 text-sm text-white/60">
-        Swap: {fromSym} → {toSym}
-      </p>
-      <p className="mb-4 text-xs text-white/40">
-        Route via LI.FI (DEX aggregator)
-        {quote?.tool && (
-          <span className="ml-1 text-white/50">
-            · {quote.tool}
-          </span>
-        )}
-      </p>
-      {needsWrap && (
-        <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-          You have native ETH. It will be wrapped to WETH first, then
-          the swap will execute.
+  const body = (
+    <>
+        <p className="text-sm text-muted-foreground">
+          Swap: {fromSym} → {toSym}
         </p>
-      )}
-      <div className="space-y-4">
+        <p className="text-xs text-muted-foreground/70">
+          Route via LI.FI (DEX aggregator)
+          {quote?.tool && (
+            <span className="ml-1 text-muted-foreground">
+              · {quote.tool}
+            </span>
+          )}
+        </p>
+        {needsWrap && (
+          <Alert className="border-amber-200 bg-amber-50">
+            <AlertDescription className="text-sm text-amber-600">
+              You have native ETH. It will be wrapped to WETH first, then
+              the swap will execute.
+            </AlertDescription>
+          </Alert>
+        )}
         <div>
-          <label className="mb-2 block text-sm text-white/60">
+          <label className="mb-2 block text-sm text-muted-foreground">
             Amount {fromSym}
           </label>
-          <input
+          <Input
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0"
-            className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-white placeholder:text-white/40"
           />
         </div>
         {amountNum > 0 && (
-          <div className="rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white/80">
+          <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm text-foreground/80">
             {quoteLoading ? (
-              <span className="text-white/50">
-                Fetching quote from LI.FI…
+              <span className="text-muted-foreground">
+                Fetching quote from LI.FI...
               </span>
             ) : outFormatted ? (
               <>
@@ -359,7 +358,7 @@ export function ManualRebalance({
                 {toSym}
                 {quote?.gasCostUSD &&
                   parseFloat(quote.gasCostUSD) > 0 && (
-                    <span className="ml-2 text-white/40">
+                    <span className="ml-2 text-muted-foreground/70">
                       (gas ≈ ${parseFloat(quote.gasCostUSD).toFixed(4)})
                     </span>
                   )}
@@ -371,7 +370,7 @@ export function ManualRebalance({
                   maximumFractionDigits: 6,
                 })}{" "}
                 {toSym}
-                <span className="ml-2 text-white/40">
+                <span className="ml-2 text-muted-foreground/70">
                   (price estimate)
                 </span>
               </>
@@ -379,59 +378,72 @@ export function ManualRebalance({
           </div>
         )}
         {insufficientWallet && !needsWrap && amountNum > 0 && (
-          <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-            <p className="font-medium">
-              ⚠ Not enough {fromSym} in wallet
-            </p>
-            <p className="mt-1 text-xs text-red-300/80">
-              In wallet: {walletBalanceNum.toLocaleString(undefined, { maximumFractionDigits: 6 })} {fromSym}
-              {hasVaultBalance && (
-                <>
-                  {" "}· In Vault: {vaultBalanceNum.toLocaleString(undefined, { maximumFractionDigits: 6 })} {fromSym}
-                </>
-              )}
-            </p>
-            {hasVaultBalance && (
-              <p className="mt-1 text-xs text-red-300/60">
-                For manual swap, tokens must be in your wallet, not in Vault.
-                Withdraw from Vault first.
+          <Alert variant="destructive">
+            <AlertDescription>
+              <p className="font-medium">
+                Not enough {fromSym} in wallet
               </p>
-            )}
-          </div>
+              <p className="mt-1 text-xs">
+                In wallet: {walletBalanceNum.toLocaleString(undefined, { maximumFractionDigits: 6 })} {fromSym}
+                {hasVaultBalance && (
+                  <>
+                    {" "}· In Vault: {vaultBalanceNum.toLocaleString(undefined, { maximumFractionDigits: 6 })} {fromSym}
+                  </>
+                )}
+              </p>
+              {hasVaultBalance && (
+                <p className="mt-1 text-xs opacity-80">
+                  For manual swap, tokens must be in your wallet, not in Vault.
+                  Withdraw from Vault first.
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
         )}
-        <button
+        <Button
           type="button"
           disabled={isButtonDisabled}
           onClick={handleRebalance}
-          className="w-full rounded-lg bg-[#0052FF] py-3 font-medium text-white transition hover:bg-[#0046e0] disabled:opacity-50"
+          className="w-full py-3"
         >
           {isPending || isSendPending || swapping
-            ? "Waiting for confirmation…"
+            ? "Waiting for confirmation..."
             : needsWrap
               ? "Wrap ETH to WETH and rebalance"
               : needsApproval
                 ? "Approve and rebalance"
                 : "Rebalance (confirm in wallet)"}
-        </button>
+        </Button>
         {amountNum > 0 &&
           !quote &&
           !quoteLoading &&
           !error && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-              Route not found. Possibly insufficient
-              liquidity for this pair.
-            </div>
+            <Alert className="border-amber-200 bg-amber-50">
+              <AlertDescription className="text-sm text-amber-600">
+                Route not found. Possibly insufficient
+                liquidity for this pair.
+              </AlertDescription>
+            </Alert>
           )}
         {error && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-            {error}
-          </div>
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
-        <p className="text-xs text-white/50">
+        <p className="text-xs text-muted-foreground">
           Connect wallet and confirm the transaction. Tokens
           remain in your custody.
         </p>
-      </div>
-    </div>
+    </>
+  );
+
+  if (compact) return <div className="space-y-3">{body}</div>;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Manual rebalance</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">{body}</CardContent>
+    </Card>
   );
 }

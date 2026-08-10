@@ -1,11 +1,20 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { useAccount, useReadContracts } from "wagmi";
+import { useAccount } from "wagmi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatUnits } from "viem";
-import { REBALANCER_VAULT_ADDRESS } from "@/lib/constants";
-import { VAULT_ABI } from "@/lib/vault-abi";
+import { useVaultBalances } from "@/hooks/use-vault-balances";
+import { useUserVault } from "@/hooks/use-user-vault";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type Trigger = {
   id: string;
@@ -28,8 +37,8 @@ export type Trigger = {
 };
 
 const OPERATORS = [
-  { value: "gte" as const, label: "≥", desc: "Rise to (greater or equal)" },
-  { value: "lte" as const, label: "≤", desc: "Fall to (less or equal)" },
+  { value: "gte" as const, label: "\u2265", desc: "Rise to (greater or equal)" },
+  { value: "lte" as const, label: "\u2264", desc: "Fall to (less or equal)" },
   { value: "eq" as const, label: "=", desc: "Reach (exact)" },
 ] as const;
 
@@ -240,46 +249,46 @@ export function TriggerForm({
       : currentAmt;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-      <h3 className="mb-4 text-lg font-semibold text-white">
-        Triggers (automatic rebalancing)
-      </h3>
-
-      {/* Direction toggle */}
-      {onDirectionChange && (
-        <div className="mb-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() =>
-              onDirectionChange(direction === "1to2" ? "2to1" : "1to2")
-            }
-            className="flex items-center gap-2 rounded-lg bg-[#0052FF] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#0046e0]"
-          >
-            <span>
-              {fromSym} → {toSym}
-            </span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="opacity-70"
+    <Card>
+      <CardHeader>
+        <CardTitle>Triggers (automatic rebalancing)</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Direction toggle */}
+        {onDirectionChange && (
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              onClick={() =>
+                onDirectionChange(direction === "1to2" ? "2to1" : "1to2")
+              }
+              size="sm"
+              className="flex items-center gap-2"
             >
-              <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
-            </svg>
-          </button>
-          <span className="text-xs text-white/50">
-            Sell {fromSym}, buy {toSym}
-          </span>
-        </div>
-      )}
+              <span>
+                {fromSym} → {toSym}
+              </span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="opacity-70"
+              >
+                <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Sell {fromSym}, buy {toSym}
+            </span>
+          </div>
+        )}
 
-      <div className="space-y-4">
         {/* ---- Metric selector ---- */}
         <div className="flex flex-wrap gap-3">
           <label className="flex items-center gap-2">
@@ -292,7 +301,7 @@ export function TriggerForm({
               }}
               className="rounded-full"
             />
-            <span className="text-sm text-white/80">By token price</span>
+            <span className="text-sm text-foreground/80">By token price</span>
           </label>
           <label className="flex items-center gap-2">
             <input
@@ -304,17 +313,17 @@ export function TriggerForm({
               }}
               className="rounded-full"
             />
-            <span className="text-sm text-white/80">By ratio</span>
+            <span className="text-sm text-foreground/80">By ratio</span>
           </label>
         </div>
 
         {metric === "price" && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-white/60">Price</span>
+            <span className="text-sm text-muted-foreground">Price</span>
             <select
               value={priceToken}
               onChange={(e) => setPriceToken(e.target.value)}
-              className="rounded border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+              className="rounded border border-input bg-background px-3 py-2 text-sm text-foreground"
             >
               <option value={token1}>{sym1}</option>
               <option value={token2}>{sym2}</option>
@@ -324,7 +333,7 @@ export function TriggerForm({
 
         {/* ---- Condition row ---- */}
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-white/80">
+          <span className="text-foreground/80">
             {metric === "ratio"
               ? `When 1 ${sym1} =`
               : "When price (USD) ="}
@@ -334,7 +343,7 @@ export function TriggerForm({
             onChange={(e) =>
               setTriggerType(e.target.value as "gte" | "lte" | "eq")
             }
-            className="rounded border border-white/20 bg-white/5 px-3 py-2 text-white"
+            className="rounded border border-input bg-background px-3 py-2 text-foreground"
           >
             {OPERATORS.map((o) => (
               <option key={o.value} value={o.value} title={o.desc}>
@@ -342,85 +351,58 @@ export function TriggerForm({
               </option>
             ))}
           </select>
-          <input
+          <Input
             type="number"
             value={triggerValue}
             onChange={(e) => setTriggerValue(e.target.value)}
             step={metric === "price" ? "0.01" : "0.0001"}
             placeholder={metric === "ratio" ? ratio.toFixed(2) : "0"}
-            className="w-32 rounded border border-white/20 bg-white/5 px-3 py-2 text-white"
+            className="w-32"
           />
           {metric === "ratio" && (
-            <span className="text-white/80">{sym2}</span>
+            <span className="text-foreground/80">{sym2}</span>
           )}
           {metric === "price" && (
-            <span className="text-white/80">USD</span>
+            <span className="text-foreground/80">USD</span>
           )}
           {metric === "price" && (() => {
             const currentPrice = priceToken.toLowerCase() === token1.toLowerCase() ? price1 : price2;
-            const selectedSym = priceToken.toLowerCase() === token1.toLowerCase() ? sym1 : sym2;
             return currentPrice > 0 ? (
-              <span className="text-xs text-white/40">
-                Now: <span className="text-white/60 font-medium">${currentPrice < 0.01 ? currentPrice.toPrecision(4) : currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</span>
+              <span className="text-xs text-muted-foreground/70">
+                Now: <span className="text-muted-foreground font-medium">${currentPrice < 0.01 ? currentPrice.toPrecision(4) : currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</span>
               </span>
             ) : null;
           })()}
         </div>
 
         {/* ---- Amount selector ---- */}
-        <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-3">
-          <p className="text-sm font-medium text-white/70">
+        <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-3">
+          <p className="text-sm font-medium text-foreground/70">
             How much to rebalance
           </p>
 
           {/* Mode toggle */}
-          <div className="flex gap-1 rounded-lg bg-white/5 p-0.5">
-            <button
-              type="button"
-              onClick={() => {
-                setAmountMode("percent");
-                setAmountValue("100");
-              }}
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                amountMode === "percent"
-                  ? "bg-[#0052FF] text-white"
-                  : "text-white/60 hover:text-white"
-              }`}
-            >
-              % of balance
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAmountMode("tokens");
-                setAmountValue("");
-              }}
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                amountMode === "tokens"
-                  ? "bg-[#0052FF] text-white"
-                  : "text-white/60 hover:text-white"
-              }`}
-            >
-              Token amount
-            </button>
-          </div>
+          <Tabs value={amountMode} onValueChange={(v) => { if (v === "percent") { setAmountMode("percent"); setAmountValue("100"); } else { setAmountMode("tokens"); setAmountValue(""); } }}>
+            <TabsList className="w-full">
+              <TabsTrigger value="percent" className="flex-1">% of balance</TabsTrigger>
+              <TabsTrigger value="tokens" className="flex-1">Token amount</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           {/* Percent presets */}
           {amountMode === "percent" && (
             <div className="flex gap-2">
               {PERCENT_PRESETS.map((p) => (
-                <button
+                <Button
                   key={p}
                   type="button"
+                  variant={amountValue === String(p) ? "secondary" : "outline"}
+                  size="sm"
                   onClick={() => setAmountValue(String(p))}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                    amountValue === String(p)
-                      ? "bg-white/20 text-white"
-                      : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80"
-                  }`}
+                  className="text-sm"
                 >
                   {p}%
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -428,7 +410,7 @@ export function TriggerForm({
           {/* Amount input */}
           <div className="flex items-center gap-2">
             <div className="relative w-full">
-              <input
+              <Input
                 type="number"
                 value={amountValue}
                 onChange={(e) => setAmountValue(e.target.value)}
@@ -442,7 +424,7 @@ export function TriggerForm({
                 min={0}
                 max={amountMode === "percent" ? 100 : undefined}
                 step={amountMode === "percent" ? "1" : "0.000001"}
-                className="w-full rounded border border-white/20 bg-white/5 px-3 py-2 pr-16 text-white placeholder:text-white/30"
+                className="pr-16"
               />
               {amountMode === "tokens" && fromBalance > 0 && (
                 <button
@@ -455,20 +437,20 @@ export function TriggerForm({
                       })
                     )
                   }
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded bg-white/10 px-2 py-0.5 text-xs font-medium text-white/60 hover:bg-white/20 hover:text-white"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
                   MAX
                 </button>
               )}
             </div>
-            <span className="shrink-0 text-sm text-white/60">
+            <span className="shrink-0 text-sm text-muted-foreground">
               {amountMode === "percent" ? "%" : fromSym}
             </span>
           </div>
 
           {/* Available balance hint */}
           {amountMode === "tokens" && fromBalance > 0 && (
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-muted-foreground/70">
               Available:{" "}
               {fromBalance.toLocaleString(undefined, {
                 maximumFractionDigits: 6,
@@ -479,8 +461,8 @@ export function TriggerForm({
 
           {/* Resolved amount hint */}
           {amountMode === "percent" && !isNaN(currentAmt) && currentAmt > 0 && fromBalance > 0 && (
-            <p className="text-xs text-white/40">
-              ≈{" "}
+            <p className="text-xs text-muted-foreground/70">
+              &asymp;{" "}
               {resolvedTokens.toLocaleString(undefined, {
                 maximumFractionDigits: 6,
               })}{" "}
@@ -488,88 +470,75 @@ export function TriggerForm({
             </p>
           )}
           {amountMode === "tokens" && !isNaN(currentAmt) && currentAmt > 0 && fromBalance > 0 && (
-            <p className="text-xs text-white/40">
-              ≈{" "}
+            <p className="text-xs text-muted-foreground/70">
+              &asymp;{" "}
               {((currentAmt / fromBalance) * 100).toFixed(1)}% of balance
             </p>
           )}
         </div>
 
-        <p className="text-sm text-white/50">
+        <p className="text-sm text-muted-foreground">
           Action: Sell {fromSym}, buy {toSym}
         </p>
 
-        <button
+        <Button
           type="button"
           onClick={handleAdd}
           disabled={!address || !canAdd || addMutation.isPending}
-          className="rounded-lg bg-[#0052FF] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#0046e0] disabled:opacity-50"
         >
-          {addMutation.isPending ? "Adding…" : "Add trigger"}
-        </button>
+          {addMutation.isPending ? "Adding..." : "Add trigger"}
+        </Button>
 
         {/* ---- Active triggers ---- */}
         {activeTriggers.length > 0 && (
-          <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
-            <p className="text-sm font-medium text-white/80">Active triggers</p>
+          <div className="space-y-2">
+            <Separator />
+            <p className="text-sm font-medium text-foreground/80">Active triggers</p>
             {activeTriggers.map((t) => (
                 <div
                   key={t.id}
-                  className="rounded-lg border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
+                  className="rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
-                      <span className="text-white/90">{formatCondition(t)}</span>
-                      <span className="ml-2 text-white/50">→ {formatAction(t)}</span>
+                      <span className="text-foreground/90">{formatCondition(t)}</span>
+                      <span className="ml-2 text-muted-foreground">&rarr; {formatAction(t)}</span>
                       {t.amount && (
-                        <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 text-xs text-white/50">
+                        <Badge variant="outline" className="ml-2 text-xs">
                           {formatAmount(t)}
-                        </span>
+                        </Badge>
                       )}
                     </div>
                     <button
                       type="button"
                       onClick={() => removeMutation.mutate(t.id)}
                       disabled={removeMutation.isPending}
-                      className="ml-2 shrink-0 text-red-400/80 hover:text-red-400"
+                      className="ml-2 shrink-0 text-red-600/80 hover:text-red-600"
                     >
-                      ✕
+                      &#10005;
                     </button>
                   </div>
                   {/* Auto-mode toggle */}
-                  <div className="mt-2 flex items-center justify-between border-t border-white/5 pt-2">
+                  <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleAuto(t.id, !t.autoEnabled)}
+                      <Switch
+                        checked={t.autoEnabled}
+                        onCheckedChange={(checked) => toggleAuto(t.id, checked)}
                         disabled={autoToggling === t.id}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
-                          t.autoEnabled ? "bg-emerald-500" : "bg-white/20"
-                        } ${autoToggling === t.id ? "opacity-50" : ""}`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                            t.autoEnabled ? "translate-x-4" : "translate-x-0.5"
-                          } mt-0.5`}
-                        />
-                      </button>
-                    <span className="text-xs text-white/50">
+                      />
+                    <span className="text-xs text-muted-foreground">
                       {autoToggling === t.id
-? "Toggling…"
-                          : t.autoEnabled
+                        ? "Toggling..."
+                        : t.autoEnabled
                           ? "Trigger on"
                           : "Trigger off"}
                     </span>
                     </div>
                     {t.autoEnabled && (
-                    <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-400">
-                      Active
-                    </span>
+                      <Badge variant="success">Active</Badge>
                     )}
                     {t.status === "disabled" && !t.autoEnabled && (
-                    <span className="rounded bg-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
-                      Auto-stop (balance 0)
-                    </span>
+                      <Badge variant="warning">Auto-stop (balance 0)</Badge>
                     )}
                   </div>
                 </div>
@@ -579,39 +548,38 @@ export function TriggerForm({
 
         {/* ---- Trigger history ---- */}
         {historyTriggers.length > 0 && (
-          <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
-            <p className="text-sm font-medium text-white/80">Trigger history</p>
+          <div className="space-y-2">
+            <Separator />
+            <p className="text-sm font-medium text-foreground/80">Trigger history</p>
             {historyTriggers.map((t) => (
                 <div
                   key={t.id}
-                  className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 text-sm"
+                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm"
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
-                      <span className="text-white/70">{formatCondition(t)}</span>
-                      <span className="ml-2 text-white/40">→ {formatAction(t)}</span>
+                      <span className="text-foreground/70">{formatCondition(t)}</span>
+                      <span className="ml-2 text-muted-foreground/70">&rarr; {formatAction(t)}</span>
                       {t.amount && (
-                        <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 text-xs text-white/40">
+                        <Badge variant="outline" className="ml-2 text-xs">
                           {formatAmount(t)}
-                        </span>
+                        </Badge>
                       )}
                     </div>
                     <button
                       type="button"
                       onClick={() => removeMutation.mutate(t.id)}
                       disabled={removeMutation.isPending}
-                      className="ml-2 shrink-0 text-red-400/50 hover:text-red-400"
+                      className="ml-2 shrink-0 text-red-600/50 hover:text-red-600"
                       title="Remove from history"
                     >
-                      ✕
+                      &#10005;
                     </button>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-white/5 pt-2">
-                    <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-400">
-                      Executed
-                    </span>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                    <Badge variant="success">Executed</Badge>
                     {t.lastTriggered && (
-                      <span className="text-xs text-white/40">
+                      <span className="text-xs text-muted-foreground/70">
                         {new Date(t.lastTriggered).toLocaleString("ru")}
                       </span>
                     )}
@@ -620,20 +588,22 @@ export function TriggerForm({
                         href={`https://basescan.org/tx/${t.txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-blue-400/80 hover:text-blue-400 hover:underline"
+                        className="text-xs text-blue-600/80 hover:text-blue-600 hover:underline"
                       >
-                        TX: {t.txHash.slice(0, 10)}…{t.txHash.slice(-6)}
+                        TX: {t.txHash.slice(0, 10)}...{t.txHash.slice(-6)}
                       </a>
                     )}
                     {/* Re-activate button */}
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => toggleAuto(t.id, true)}
                       disabled={autoToggling === t.id}
-                      className="ml-auto rounded bg-white/10 px-2 py-0.5 text-xs text-white/60 hover:bg-white/20 hover:text-white"
+                      className="ml-auto text-xs"
                     >
-                      {autoToggling === t.id ? "…" : "Turn on again"}
-                    </button>
+                      {autoToggling === t.id ? "..." : "Turn on again"}
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -652,12 +622,14 @@ export function TriggerForm({
         />
 
         {/* ---- Deposit warning at the bottom of the card ---- */}
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-          <strong>For automatic rebalancing</strong> you need to deposit tokens
-          into the contract. Otherwise triggers cannot execute swaps.
-        </p>
-      </div>
-    </div>
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertDescription className="text-sm text-amber-600">
+            <strong>For automatic rebalancing</strong> you need to deposit tokens
+            into the contract. Otherwise triggers cannot execute swaps.
+          </AlertDescription>
+        </Alert>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -696,8 +668,7 @@ function RebalanceStats({
   triggers: Trigger[];
 }) {
   const { address } = useAccount();
-  const vaultAddr = REBALANCER_VAULT_ADDRESS as `0x${string}`;
-  const hasVault = vaultAddr !== "0x0000000000000000000000000000000000000000";
+  const { hasVault } = useUserVault();
 
   const addr1 = token1.toLowerCase();
   const addr2 = token2.toLowerCase();
@@ -705,29 +676,12 @@ function RebalanceStats({
   // Pair ID for filtering history
   const pairId = [addr1, addr2].sort().join("-");
 
-  // Read ACTUAL vault balances from the smart contract (always correct, never negative)
-  const { data: vaultData } = useReadContracts({
-    contracts: [
-      {
-        address: vaultAddr,
-        abi: VAULT_ABI,
-        functionName: "balances",
-        args: address ? [address, token1 as `0x${string}`] : undefined,
-      },
-      {
-        address: vaultAddr,
-        abi: VAULT_ABI,
-        functionName: "balances",
-        args: address ? [address, token2 as `0x${string}`] : undefined,
-      },
-    ],
-    query: { enabled: !!address && hasVault },
-  });
+  // Actual balances inside the user's personal (non-custodial) vault.
+  const { vaultBalances } = useVaultBalances([token1, token2]);
+  const cur1 = Number(formatUnits(vaultBalances[addr1] ?? 0n, dec1));
+  const cur2 = Number(formatUnits(vaultBalances[addr2] ?? 0n, dec2));
 
-  const cur1 = Number(formatUnits((vaultData?.[0]?.result as bigint) ?? 0n, dec1));
-  const cur2 = Number(formatUnits((vaultData?.[1]?.result as bigint) ?? 0n, dec2));
-
-  // Fetch ALL user history (no pair filter) — for total deposits per token
+  // Fetch ALL user history (no pair filter) -- for total deposits per token
   const { data: allHistory = [], isLoading: historyLoading } = useQuery({
     queryKey: ["vault-history-all", address],
     queryFn: async () => {
@@ -743,7 +697,7 @@ function RebalanceStats({
 
   // "Deposited" = total deposits for each token across ALL pairs
   let depRaw1 = 0n, depRaw2 = 0n, wdRaw1 = 0n, wdRaw2 = 0n;
-  // Rebalance count — only for THIS pair
+  // Rebalance count -- only for THIS pair
   let historyRebalanceCount = 0;
 
   for (const e of allHistory) {
@@ -788,42 +742,43 @@ function RebalanceStats({
   if (!hasData && !historyLoading) return null;
 
   const changeColor = (v: number) =>
-    v > 0 ? "text-emerald-400" : v < 0 ? "text-red-400" : "text-white/50";
+    v > 0 ? "text-emerald-600" : v < 0 ? "text-red-600" : "text-muted-foreground";
 
   const fmt = (v: number) =>
     v.toLocaleString(undefined, { maximumFractionDigits: 4 });
 
   return (
-    <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
-      <p className="text-sm font-medium text-white/80">
+    <div className="space-y-2">
+      <Separator />
+      <p className="text-sm font-medium text-foreground/80">
         Rebalance stats
       </p>
 
       {historyLoading ? (
-        <div className="rounded-lg border border-white/10 bg-black/30 p-3 text-center text-xs text-white/40">
-          Loading data…
+        <div className="rounded-lg border border-border bg-card p-3 text-center">
+          <Skeleton className="mx-auto h-4 w-32" />
         </div>
       ) : (
-        <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-          <div className="mb-3 text-xs text-white/40">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="mb-3 text-xs text-muted-foreground/70">
             Total rebalances:{" "}
-            <span className="font-medium text-white/70">
+            <span className="font-medium text-foreground/70">
               {rebalanceCount}
             </span>
           </div>
           <div className="grid grid-cols-4 gap-2 text-xs">
             {/* Header */}
-            <div className="text-white/40" />
-            <div className="text-center text-white/40">Deposited</div>
-            <div className="text-center text-white/40">Now</div>
-            <div className="text-center text-white/40">Change</div>
+            <div className="text-muted-foreground/70" />
+            <div className="text-center text-muted-foreground/70">Deposited</div>
+            <div className="text-center text-muted-foreground/70">Now</div>
+            <div className="text-center text-muted-foreground/70">Change</div>
 
             {/* Token 1 */}
-            <div className="font-medium text-white/70">{sym1}</div>
-            <div className="text-center text-white/60">
-              {net1 > 0 ? fmt(net1) : dep1 > 0 ? fmt(dep1) : "—"}
+            <div className="font-medium text-foreground/70">{sym1}</div>
+            <div className="text-center text-muted-foreground">
+              {net1 > 0 ? fmt(net1) : dep1 > 0 ? fmt(dep1) : "\u2014"}
             </div>
-            <div className="text-center text-white/90">{fmt(cur1)}</div>
+            <div className="text-center text-foreground/90">{fmt(cur1)}</div>
             <div
               className={`text-center font-medium ${changeColor(change1)}`}
             >
@@ -833,16 +788,16 @@ function RebalanceStats({
                   {change1.toFixed(1)}%
                 </>
               ) : (
-                "—"
+                "\u2014"
               )}
             </div>
 
             {/* Token 2 */}
-            <div className="font-medium text-white/70">{sym2}</div>
-            <div className="text-center text-white/60">
-              {net2 > 0 ? fmt(net2) : dep2 > 0 ? fmt(dep2) : "—"}
+            <div className="font-medium text-foreground/70">{sym2}</div>
+            <div className="text-center text-muted-foreground">
+              {net2 > 0 ? fmt(net2) : dep2 > 0 ? fmt(dep2) : "\u2014"}
             </div>
-            <div className="text-center text-white/90">{fmt(cur2)}</div>
+            <div className="text-center text-foreground/90">{fmt(cur2)}</div>
             <div
               className={`text-center font-medium ${changeColor(change2)}`}
             >
@@ -852,14 +807,14 @@ function RebalanceStats({
                   {change2.toFixed(1)}%
                 </>
               ) : (
-                "—"
+                "\u2014"
               )}
             </div>
           </div>
 
           {/* Withdrawals note */}
           {(wd1 > 0 || wd2 > 0) && (
-            <div className="mt-2 border-t border-white/5 pt-2 text-[10px] text-white/30">
+            <div className="mt-2 border-t border-border pt-2 text-[10px] text-muted-foreground/70">
               Withdrawn: {wd1 > 0 ? `${fmt(wd1)} ${sym1}` : ""}
               {wd1 > 0 && wd2 > 0 ? ", " : ""}
               {wd2 > 0 ? `${fmt(wd2)} ${sym2}` : ""}
