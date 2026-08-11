@@ -25,6 +25,7 @@ import {
 } from "@/lib/agent-grants";
 import { AgentGrantCard } from "./agent-grant-card";
 import { AgentVaultDeposit } from "./agent-vault-deposit";
+import { AgentActivity } from "./agent-activity";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -460,6 +461,8 @@ export function AgentVaultManager() {
           {err && <p className="text-xs text-destructive">{err}</p>}
         </CardContent>
       </Card>
+
+      <AgentActivity vault={vaultAddress!} />
 
       {/* Active grants */}
       <div>
