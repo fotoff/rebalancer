@@ -58,3 +58,6 @@ packages/ai-advisor/
 
 # TS incremental build cache
 *.tsbuildinfo
+
+# Private grant application draft
+GRANT_APPLICATION.md
