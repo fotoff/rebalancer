@@ -10,7 +10,7 @@ export const TOKENS = {
   BRETT: "0x532f27101965dd16442E59d40670FaF5eBB142E4" as const,
   TOSHI: "0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4" as const,
   OWB: "0xEF5997c2cf2f6c138196f8A6203afc335206b3c1" as const,
-  RNBW: "0xa53887F7e7C1bF5010b8627F1c1ba94FE7A5D6e0" as const,
+  RNBW: "0xa53887F7e7c1bf5010b8627F1C1ba94fE7a5d6E0" as const,
 } as const;
 
 // Aerodrome Router V2 & Pool Factories on Base

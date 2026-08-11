@@ -24,6 +24,7 @@ import {
   type GrantRef,
 } from "@/lib/agent-grants";
 import { AgentGrantCard } from "./agent-grant-card";
+import { AgentVaultDeposit } from "./agent-vault-deposit";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,14 +99,22 @@ export function AgentVaultManager() {
     query: { enabled: Boolean(vaultAddress) },
   });
 
-  // Oracle coverage for the selected direction — drives the warning below.
-  const { data: hasOracle } = useReadContract({
+  // Oracle coverage for the selected direction. Loading and failure are kept
+  // distinct from "no oracle": a failed read must not silently look like one,
+  // or the trust opt-in below would vanish with no way to grant the pair.
+  const {
+    data: hasOracle,
+    isLoading: oracleLoading,
+    isError: oracleError,
+  } = useReadContract({
     address: FACTORY_ADDRESS,
     abi: FACTORY_ABI,
     functionName: "hasOracle",
     args: [from.address, to.address],
     query: { enabled: fromIdx !== toIdx },
   });
+  const oracleKnown = !oracleLoading && !oracleError;
+  const needsTrust = oracleKnown && hasOracle !== true;
 
   const totalVaultValue = useMemo(
     () =>
@@ -144,7 +153,7 @@ export function AgentVaultManager() {
       setErr("Pick two different tokens");
       return;
     }
-    if (!hasOracle && !trustQuote) {
+    if (needsTrust && !trustQuote) {
       setErr("No oracle for this pair — tick the trust box to grant it anyway");
       return;
     }
@@ -304,6 +313,8 @@ export function AgentVaultManager() {
         </CardContent>
       </Card>
 
+      <AgentVaultDeposit vault={vaultAddress!} onDeposited={refetchBalances} />
+
       {/* Grant form */}
       <Card>
         <CardHeader className="pb-3">
@@ -402,7 +413,7 @@ export function AgentVaultManager() {
             </div>
           </div>
 
-          {fromIdx !== toIdx && hasOracle === false && (
+          {fromIdx !== toIdx && needsTrust && (
             <label className="flex items-start gap-2 rounded-md bg-amber-50 p-2 text-[11px] leading-snug text-amber-800">
               <input
                 type="checkbox"
@@ -419,6 +430,13 @@ export function AgentVaultManager() {
             </label>
           )}
 
+          {fromIdx !== toIdx && oracleError && (
+            <p className="rounded-md bg-destructive/10 p-2 text-[11px] text-destructive">
+              Could not read oracle coverage for this pair. Reload before
+              granting — do not assume either answer.
+            </p>
+          )}
+
           <div className="rounded-md bg-muted/50 p-3 text-[11px] leading-relaxed text-muted-foreground">
             The agent gets a 1% slippage ceiling and a 5-minute cooldown.
             {hasOracle
@@ -429,7 +447,12 @@ export function AgentVaultManager() {
 
           <Button
             onClick={grant}
-            disabled={busy || fromIdx === toIdx || (!hasOracle && !trustQuote)}
+            disabled={
+              busy ||
+              fromIdx === toIdx ||
+              !oracleKnown ||
+              (needsTrust && !trustQuote)
+            }
             className="w-full"
           >
             {busy ? "Confirming…" : "Authorise agent"}
