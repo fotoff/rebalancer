@@ -29,10 +29,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
-// Oracle-backed majors: these are the pairs the vault can price-bound on-chain.
+// WETH/USDC are oracle-backed; the rest have no feed, so granting them requires
+// the owner to explicitly trust the agent's quote (same opt-in the operator-driven
+// vault uses for these pairs today).
 const PAIR_TOKENS = [
   { address: TOKENS.WETH, symbol: "WETH", decimals: 18 },
   { address: TOKENS.USDC, symbol: "USDC", decimals: 6 },
+  { address: TOKENS.RNBW, symbol: "RNBW", decimals: 18 },
+  { address: TOKENS.OWB, symbol: "OWB", decimals: 18 },
 ] as const;
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -61,6 +65,7 @@ export function AgentVaultManager() {
   const [maxNotional, setMaxNotional] = useState("");
   const [dailyLimit, setDailyLimit] = useState("");
   const [expiryDays, setExpiryDays] = useState<number>(7);
+  const [trustQuote, setTrustQuote] = useState(false);
 
   const from = PAIR_TOKENS[fromIdx];
   const to = PAIR_TOKENS[toIdx];
@@ -139,10 +144,8 @@ export function AgentVaultManager() {
       setErr("Pick two different tokens");
       return;
     }
-    if (!hasOracle) {
-      setErr(
-        "This pair has no on-chain oracle — granting it from the UI is disabled."
-      );
+    if (!hasOracle && !trustQuote) {
+      setErr("No oracle for this pair — tick the trust box to grant it anyway");
       return;
     }
     setBusy(true);
@@ -167,7 +170,7 @@ export function AgentVaultManager() {
           300, // 5-min cooldown, same rationale as operator pairs
           expiresAt,
           notional,
-          false, // never trust an agent quote from the UI
+          hasOracle ? false : trustQuote, // oracle wins whenever there is one
         ],
       });
       await publicClient?.waitForTransactionReceipt({ hash: permHash });
@@ -192,6 +195,7 @@ export function AgentVaultManager() {
       setAgent("");
       setMaxNotional("");
       setDailyLimit("");
+      setTrustQuote(false);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message.slice(0, 120) : "Failed");
     } finally {
@@ -399,21 +403,33 @@ export function AgentVaultManager() {
           </div>
 
           {fromIdx !== toIdx && hasOracle === false && (
-            <p className="rounded-md bg-amber-50 p-2 text-[11px] text-amber-800">
-              This pair has no on-chain oracle, so the vault cannot bound the
-              price itself. Granting it is disabled here.
-            </p>
+            <label className="flex items-start gap-2 rounded-md bg-amber-50 p-2 text-[11px] leading-snug text-amber-800">
+              <input
+                type="checkbox"
+                checked={trustQuote}
+                onChange={(e) => setTrustQuote(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                No oracle for {from.symbol}&nbsp;&rarr;&nbsp;{to.symbol}, so the
+                vault cannot bound the price itself. Tick to accept the
+                agent&apos;s own quote as the floor. Only do this for an agent
+                you run — every other limit still applies.
+              </span>
+            </label>
           )}
 
           <div className="rounded-md bg-muted/50 p-3 text-[11px] leading-relaxed text-muted-foreground">
-            The agent gets a 1% slippage ceiling and a 5-minute cooldown. The
-            oracle floor always wins over the agent&apos;s own quote, and you can
-            revoke at any moment.
+            The agent gets a 1% slippage ceiling and a 5-minute cooldown.
+            {hasOracle
+              ? " The oracle floor always wins over the agent's own quote"
+              : " Without an oracle the agent's quote is the floor"}
+            , and you can revoke at any moment.
           </div>
 
           <Button
             onClick={grant}
-            disabled={busy || fromIdx === toIdx || !hasOracle}
+            disabled={busy || fromIdx === toIdx || (!hasOracle && !trustQuote)}
             className="w-full"
           >
             {busy ? "Confirming…" : "Authorise agent"}
