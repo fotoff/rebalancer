@@ -8,6 +8,7 @@ import { Header } from "@/components/header";
 import { Landing } from "@/components/landing";
 import { PortfolioList } from "@/components/portfolio/portfolio-list";
 import { NonCustodialVault } from "@/components/vault/noncustodial-vault";
+import { AgentVaultLink } from "@/components/agent/agent-vault-link";
 import { PairSuggestions } from "@/components/pairs/pair-suggestions";
 import { PairCreator } from "@/components/pairs/pair-creator";
 import { SavedPairs } from "@/components/pairs/saved-pairs";
@@ -95,6 +96,7 @@ export default function Home() {
           <VaultBalancesProvider>
             <div className="space-y-8">
               <NonCustodialVault />
+              <AgentVaultLink />
               <PortfolioList onAddToPair={handleAddToPair} />
               <PairSuggestions onCreatePair={handlePairCreated} />
               <SavedPairs onSelectPair={handleSelectPair} />

@@ -33,6 +33,14 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 
+// Node does not read .env on its own. loadEnvFile lands in 20.12; on anything
+// older the operator can still export the variables or use --env-file.
+try {
+  process.loadEnvFile(new URL(".env", import.meta.url).pathname);
+} catch {
+  /* no .env, or a Node too old — fall through to the env check below */
+}
+
 // ─── Flags ────────────────────────────────────────────────
 const argv = new Set(process.argv.slice(2));
 const EXECUTE = argv.has("--execute");
