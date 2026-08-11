@@ -17,6 +17,7 @@
  * runs the full decision path and prints the transaction it *would* send.
  *
  *   node agent.mjs --once            # one dry cycle, free signal, no broadcast
+ *   node agent.mjs --once --force    # ignore the signal (testing/demo only)
  *   node agent.mjs --once --pay      # same, but actually pay $0.01 over x402
  *   node agent.mjs --execute         # live: real trades, on a loop
  */
@@ -37,6 +38,9 @@ const argv = new Set(process.argv.slice(2));
 const EXECUTE = argv.has("--execute");
 const ONCE = argv.has("--once");
 const PAY_FOR_SIGNAL = argv.has("--pay");
+// Override the signal gate. The chain still enforces every limit — this only
+// skips *our* opinion about whether the trade is worth making.
+const FORCE = argv.has("--force");
 
 // ─── Config ───────────────────────────────────────────────
 const RPC_URL = process.env.BASE_RPC_URL || "https://mainnet.base.org";
@@ -246,9 +250,12 @@ async function cycle(publicClient, walletClient, account) {
   const { paid, data } = await getSignal(account);
   const { trade, why } = decide(data);
   log(`signal (${paid ? "paid $0.01 via x402" : "free"}): ${why}`);
-  if (!trade) {
+  if (!trade && !FORCE) {
     log("holding — signal does not favour rebalancing");
     return;
+  }
+  if (!trade && FORCE) {
+    log("--force: trading against the signal (testing only)");
   }
 
   // 3. Route.
