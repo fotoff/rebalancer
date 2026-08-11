@@ -15,6 +15,7 @@ type Stats = {
   factory?: string;
   vaults?: number;
   agentVaults?: number | null;
+  x402Payments?: number | null;
   agentFactory?: string;
   tvlUsd?: number;
   tvlByToken?: Record<string, number>;
@@ -52,7 +53,11 @@ function Metric({
       <div className="mt-1 text-sm text-muted-foreground">{label}</div>
       {source && (
         <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground/60">
-          {source === "onchain" ? "verifiable on-chain" : "execution log"}
+          {source === "onchain"
+            ? "verifiable on-chain"
+            : source === "onchain-recent-window"
+              ? "on-chain, recent window"
+              : "execution log"}
         </div>
       )}
     </div>
@@ -105,6 +110,11 @@ export default async function StatsPage() {
                 value={String(s.agentVaults ?? 0)}
                 label="Agent vaults"
                 source={s.sources?.agentVaults}
+              />
+              <Metric
+                value={String(s.x402Payments ?? 0)}
+                label="x402 signals sold"
+                source={s.sources?.x402Payments}
               />
               <Metric
                 value={fmtUsd(s.tvlUsd)}

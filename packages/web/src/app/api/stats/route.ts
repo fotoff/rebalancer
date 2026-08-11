@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createPublicClient, http, parseAbi, formatUnits } from "viem";
+import { createPublicClient, http, parseAbi, formatUnits, parseAbiItem } from "viem";
 import { base } from "viem/chains";
 import {
   FACTORY_ADDRESS,
@@ -9,6 +9,7 @@ import {
 import { fetchTokenLiquidity } from "@/lib/token-liquidity";
 import { vaultHistory } from "@/lib/db";
 import { log } from "@/lib/logger";
+import { X402_PAY_TO } from "@/lib/x402-config";
 
 /**
  * GET /api/stats — public protocol metrics.
@@ -20,6 +21,8 @@ import { log } from "@/lib/logger";
  * response labels each metric's source explicitly rather than implying all of
  * it is chain-derived.
  */
+
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
 
 const AGENT_FACTORY_ABI = parseAbi([
   "function vaultsCount() view returns (uint256)",
@@ -167,6 +170,49 @@ export async function GET() {
       }
     }
 
+    // ── On-chain: x402 signal payments ────────────────────
+    // Our provider (Alchemy) serves eth_call but refuses eth_getLogs, so logs
+    // have to come from Base's public endpoint — which caps a call at 10k
+    // blocks and rate-limits hard. Hence a short window, scanned sparingly:
+    // this counts recent payments, not all-time.
+    // Identified by an exact $0.01 USDC transfer to the x402 address — the
+    // protocol fee is taken in the output token, so it rarely collides, but
+    // this is a heuristic and is labelled as one.
+    // Same constant the paywall itself uses, not a separate env read — the
+    // address has a fallback there, so reading the raw variable silently
+    // skipped the scan.
+    let x402Payments: number | null = null;
+    const payTo = X402_PAY_TO;
+    if (payTo) {
+      try {
+        const logClient = createPublicClient({
+          chain: base,
+          transport: http("https://mainnet.base.org"),
+        });
+        const latest = await logClient.getBlockNumber();
+        const CHUNK = 10_000n;
+        let total = 0;
+        for (let i = 0n; i < 3n; i++) {
+          const hi = latest - CHUNK * i;
+          const lo = hi > CHUNK ? hi - CHUNK : 0n;
+          const logs = await logClient.getLogs({
+            address: USDC_ADDRESS,
+            event: parseAbiItem(
+              "event Transfer(address indexed from, address indexed to, uint256 value)"
+            ),
+            args: { to: payTo },
+            fromBlock: lo,
+            toBlock: hi,
+          });
+          total += logs.filter((l) => l.args.value === 10_000n).length;
+          if (lo === 0n) break;
+        }
+        x402Payments = total;
+      } catch (e) {
+        log.warn("stats", "x402 payment scan failed", { error: String(e) });
+      }
+    }
+
     // ── Execution log: rebalances / deposits ──────────────
     let rebalances = 0;
     let deposits = 0;
@@ -188,6 +234,7 @@ export async function GET() {
       vaultsTotal: n + (agentVaults ?? 0),
       agentFactory: AGENT_FACTORY_ADDRESS,
       agentVaults,
+      x402Payments,
       tvlUsd: Math.round(tvlUsd * 100) / 100,
       tvlByToken,
       rebalances,
@@ -196,6 +243,7 @@ export async function GET() {
       sources: {
         vaults: "onchain",
         agentVaults: "onchain",
+        x402Payments: "onchain-recent-window",
         tvlUsd: "onchain",
         rebalances: "execution-log",
         deposits: "execution-log",
