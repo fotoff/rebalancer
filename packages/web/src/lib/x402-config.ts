@@ -13,6 +13,7 @@
 
 import type { Network } from "x402-next";
 import type { FacilitatorConfig } from "x402/types";
+import { createCdpAuthHeaders } from "@coinbase/x402";
 
 /** Address that receives x402 payments (defaults to the protocol fee collector). */
 export const X402_PAY_TO = (process.env.X402_PAY_TO ||
@@ -27,23 +28,22 @@ export const X402_SIGNAL_PRICE = process.env.X402_SIGNAL_PRICE || "$0.01";
 /**
  * CDP facilitator when keys are configured (required for Base mainnet), else
  * undefined → x402-next falls back to the public x402.org testnet facilitator.
+ *
+ * Uses the official @coinbase/x402 config rather than a hand-rolled header:
+ * CDP authenticates with a JWT signed by the API key, so sending
+ * `Bearer <id>:<secret>` — as this did — fails verification with an opaque
+ * "unexpected_error" and no payment ever settles.
  */
 export function getFacilitator(): FacilitatorConfig | undefined {
   const keyId = process.env.CDP_API_KEY_ID;
   const keySecret = process.env.CDP_API_KEY_SECRET;
   if (!keyId || !keySecret) return undefined;
 
-  const facilitator: FacilitatorConfig = {
+  // Only the header generator is borrowed: @coinbase/x402 and x402/types ship
+  // incompatible FacilitatorConfig shapes (its `url` is optional, ours is a
+  // template literal), so the URL is stated here rather than fought over.
+  return {
     url: "https://api.cdp.coinbase.com/platform/v2/x402",
-    createAuthHeaders: async () => {
-      const headers = { Authorization: `Bearer ${keyId}:${keySecret}` };
-      return {
-        verify: headers,
-        settle: headers,
-        supported: headers,
-        list: headers,
-      };
-    },
-  };
-  return facilitator;
+    createAuthHeaders: createCdpAuthHeaders(keyId, keySecret),
+  } as FacilitatorConfig;
 }

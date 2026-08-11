@@ -143,14 +143,22 @@ async function getSignal(account) {
     return { paid: false, data: await res.json() };
   }
 
-  const { wrapFetchWithPayment } = await import("x402-fetch");
-  const payFetch = wrapFetchWithPayment(fetch, account);
+  // x402-fetch wants a signer, not a bare account: paying means signing an
+  // EIP-3009 authorisation, which a wallet client exposes and an account does not.
+  const { wrapFetchWithPayment, createSigner } = await import("x402-fetch");
+  const signer = await createSigner("base", PRIVATE_KEY);
+  const payFetch = wrapFetchWithPayment(fetch, signer);
   const res = await payFetch(`${API}/api/x402/signal`, {
     method: "POST",
     headers,
     body,
   });
-  if (!res.ok) throw new Error(`paid signal failed: HTTP ${res.status}`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      `paid signal failed: HTTP ${res.status} ${detail.slice(0, 160)}`
+    );
+  }
   return { paid: true, data: await res.json() };
 }
 
