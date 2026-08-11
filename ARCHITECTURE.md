@@ -11,6 +11,8 @@
 | **RebalancerFactory** | `0x24bbf692267b84801D0052812eEDC2885Fc6E171` |
 | **UserVault impl** | `0x7512fB65Ed0B56d653262B7500c33B394F3F5a0a` |
 | **TimelockController** | `0x597B75a49b4b506c114206Ee0E1b6d02751d62bA` (48ч) |
+| **AgentVaultFactory** | `0xcE7328D01cD32114CF0da856588b891b06d3D2b9` |
+| **AgentVault impl** | `0x36839b4d9C9a1d3Ee034B835bC1fc9d06E01Ee50` |
 
 > **Модель изменилась:** проект перешёл с кастодиального общего vault'а (V2/V3) на
 > **non-custodial**: у каждого пользователя свой vault, выводить может только он.
@@ -202,6 +204,11 @@ Per-token `priceMaxAge` — у стейблов на Base heartbeat ~24ч, у ET
 opt-in пользователя, из котировки оператора) → `received >= minOut`, иначе revert.
 
 #### AgentVault + AgentVaultFactory (v3.2, работают **параллельно** UserVault)
+Задеплоены на Base mainnet 2026-08-11, оба верифицированы на BaseScan:
+`AgentVaultFactory 0xcE7328D01cD32114CF0da856588b891b06d3D2b9`,
+`AgentVault impl 0x36839b4d9C9a1d3Ee034B835bC1fc9d06E01Ee50`.
+Implementation залочен (`initialize` реверит — логику клонов перехватить нельзя).
+
 Execution-слой для сторонних торговых агентов. Отдельные контракты — не редеплой
 UserVault, существующие пользователи не затронуты. Конфиг читается из RebalancerFactory.
 
