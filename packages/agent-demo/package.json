@@ -1,0 +1,15 @@
+{
+  "name": "@rebalancer/agent-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reference autonomous agent: buys a rebalancing signal over x402 and trades through an AgentVault on Base.",
+  "scripts": {
+    "start": "node agent.mjs",
+    "once": "node agent.mjs --once"
+  },
+  "dependencies": {
+    "viem": "^2.55.13",
+    "x402-fetch": "^1.2.0"
+  }
+}
