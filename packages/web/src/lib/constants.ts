@@ -22,6 +22,13 @@ export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as cons
 export const FACTORY_ADDRESS =
   (process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`) || ZERO_ADDRESS;
 
+// AgentVaultFactory — the parallel execution layer for third-party agents.
+// Separate from FACTORY_ADDRESS: agent vaults are their own contracts and only
+// read shared config (routers/oracles/fee/pause) from the RebalancerFactory.
+export const AGENT_FACTORY_ADDRESS =
+  (process.env.NEXT_PUBLIC_AGENT_FACTORY_ADDRESS as `0x${string}`) ||
+  ZERO_ADDRESS;
+
 // Tokens supported in the non-custodial (oracle-bounded) model: only those with a
 // Chainlink USD feed registered on the factory. Others can't be price-bounded yet.
 export const ORACLE_SUPPORTED_TOKENS: readonly `0x${string}`[] = [

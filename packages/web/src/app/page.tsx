@@ -143,6 +143,10 @@ export default function Home() {
                 Stats
               </a>
               <span>&middot;</span>
+              <a href="/agent-vault" className="hover:text-foreground">
+                Agents
+              </a>
+              <span>&middot;</span>
               <a
                 href={`https://basescan.org/address/${process.env.NEXT_PUBLIC_FACTORY_ADDRESS ?? ""}#code`}
                 target="_blank"

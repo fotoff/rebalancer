@@ -157,7 +157,16 @@ export default function AgentsPage() {
                 </a>
               </div>
             </div>
-            <p className="pt-2">What the user grants you, per pair direction:</p>
+            <p className="pt-2">
+              Vault owners grant permissions from{" "}
+              <Link
+                href="/agent-vault"
+                className="text-foreground underline underline-offset-4"
+              >
+                the agents page
+              </Link>
+              . What they grant you, per pair direction:
+            </p>
             <Code>{`// the USER calls these on their own vault — you cannot
 setAgentPermission(
   agent, from, to, enabled,

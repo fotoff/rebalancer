@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   other: {
     // Base app domain verification
     "base:app_id": "6a50dca11af1f180d46a8795",
+    // Talent Protocol (Builder Score) project verification
+    "talentapp:project_verification":
+      "a9b9ff5550ac75668e044813d31f925e1d8de735509a069fa2304bc6406bc2fce26c658d3d8cb99a837398143307c3333c09ee3402e467055ceceb94abacb476",
   },
 };
 
