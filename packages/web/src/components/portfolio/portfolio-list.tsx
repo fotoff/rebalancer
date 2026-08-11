@@ -14,6 +14,7 @@ import { useUserVault } from "@/hooks/use-user-vault";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatUsd } from "@/lib/utils";
 
 type PortfolioListProps = {
   onAddToPair?: (tokenAddress: string) => void;
@@ -112,11 +113,11 @@ function TotalValueCell({
   return (
     <div>
       <span className="text-foreground">
-        ${totalUsdItem.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        {formatUsd(totalUsdItem)}
       </span>
       {vUsd > 0.01 && (
         <div className="text-[10px] text-cyan-600">
-          vault: ${vUsd.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          vault: {formatUsd(vUsd)}
         </div>
       )}
     </div>
@@ -445,7 +446,7 @@ export function PortfolioList({ onAddToPair }: PortfolioListProps) {
                     </td>
                     <td className="py-3 pl-2">
                       <span className={wBal > 0 ? "text-foreground" : "text-cyan-700"}>
-                        ${totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {formatUsd(totalUsd)}
                       </span>
                     </td>
                     <td className="py-3" />
@@ -521,14 +522,11 @@ export function PortfolioList({ onAddToPair }: PortfolioListProps) {
           <span className="ml-auto">
             <span className="text-muted-foreground">Total: </span>
             <span className="text-lg font-semibold text-foreground">
-              $
-              {(totalUsd + vaultTotalUsd).toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-              })}
+              {formatUsd(totalUsd + vaultTotalUsd)}
             </span>
             {vaultTotalUsd > 0.01 && (
               <span className="ml-2 text-xs text-cyan-600">
-                (vault: ${vaultTotalUsd.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                (vault: {formatUsd(vaultTotalUsd)})
               </span>
             )}
           </span>

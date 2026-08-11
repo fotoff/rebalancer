@@ -21,6 +21,7 @@ import { TokenCardActions } from "./token-card-actions";
 import { PairAnalytics } from "./pair-analytics";
 import { PriceChart } from "./price-chart";
 import { AiAdvisor } from "./ai-advisor";
+import { formatUsd } from "@/lib/utils";
 
 /* ---------- Price change badge (like on portfolio page) ---------- */
 function PriceChangeBadge({
@@ -243,11 +244,7 @@ export function PairDashboard({ token1, token2, onBack }: PairDashboardProps) {
                       )}
                       <div className="mt-2 flex items-center gap-2">
                         <span className="text-sm font-medium text-foreground/80">
-                          ≈ $
-                          {usd1.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                          ≈ {formatUsd(usd1)}
                         </span>
                         <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                           {pct1.toFixed(1)}%
@@ -339,11 +336,7 @@ export function PairDashboard({ token1, token2, onBack }: PairDashboardProps) {
                       )}
                       <div className="mt-2 flex items-center gap-2">
                         <span className="text-sm font-medium text-foreground/80">
-                          ≈ $
-                          {usd2.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                          ≈ {formatUsd(usd2)}
                         </span>
                         <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                           {pct2.toFixed(1)}%
@@ -401,11 +394,7 @@ export function PairDashboard({ token1, token2, onBack }: PairDashboardProps) {
                     {sym1} — {pct1.toFixed(1)}%
                   </span>
                   <span>
-                    Total: $
-                    {totalUsd.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    Total: {formatUsd(totalUsd)}
                   </span>
                   <span>
                     {pct2.toFixed(1)}% — {sym2}

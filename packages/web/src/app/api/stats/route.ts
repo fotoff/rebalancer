@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, http, parseAbi, formatUnits } from "viem";
 import { base } from "viem/chains";
-import { FACTORY_ADDRESS, ZERO_ADDRESS } from "@/lib/constants";
+import {
+  FACTORY_ADDRESS,
+  AGENT_FACTORY_ADDRESS,
+  ZERO_ADDRESS,
+} from "@/lib/constants";
 import { fetchTokenLiquidity } from "@/lib/token-liquidity";
 import { vaultHistory } from "@/lib/db";
 import { log } from "@/lib/logger";
@@ -16,6 +20,11 @@ import { log } from "@/lib/logger";
  * response labels each metric's source explicitly rather than implying all of
  * it is chain-derived.
  */
+
+const AGENT_FACTORY_ABI = parseAbi([
+  "function vaultsCount() view returns (uint256)",
+  "function allVaults(uint256) view returns (address)",
+]);
 
 const FACTORY_ABI = parseAbi([
   "function vaultsCount() view returns (uint256)",
@@ -82,13 +91,51 @@ export async function GET() {
           .filter((a): a is `0x${string}` => Boolean(a))
       : [];
 
+    // ── On-chain: the parallel agent-vault registry ────────
+    // Counting agent *trades* would need log indexing, which the free RPC tier
+    // cannot serve, so only the vault count is reported here rather than a
+    // number we cannot stand behind.
+    let agentVaults: number | null = null;
+    let agentVaultAddrs: `0x${string}`[] = [];
+    if (AGENT_FACTORY_ADDRESS !== ZERO_ADDRESS) {
+      try {
+        const an = Number(
+          await client.readContract({
+            address: AGENT_FACTORY_ADDRESS,
+            abi: AGENT_FACTORY_ABI,
+            functionName: "vaultsCount",
+          })
+        );
+        agentVaults = an;
+        agentVaultAddrs = an
+          ? ((await client.multicall({
+              contracts: Array.from({ length: an }, (_, i) => ({
+                address: AGENT_FACTORY_ADDRESS,
+                abi: AGENT_FACTORY_ABI,
+                functionName: "allVaults" as const,
+                args: [BigInt(i)] as const,
+              })),
+            })) as Array<{ result?: `0x${string}` }>)
+              .map((r) => r.result)
+              .filter((a): a is `0x${string}` => Boolean(a))
+          : [];
+      } catch (e) {
+        log.warn("stats", "Agent vault read failed", { error: String(e) });
+      }
+    }
+
     // ── On-chain: TVL across every vault's actual holdings ──
+    // Both registries count: an agent vault custodies user funds exactly like a
+    // UserVault does, so leaving it out understates TVL.
     let tvlUsd = 0;
     const tvlByToken: Record<string, number> = {};
     const apiKey = process.env.ALCHEMY_API_KEY;
+    const allVaultAddrs = [...vaults, ...agentVaultAddrs];
 
-    if (apiKey && vaults.length) {
-      const perVault = await Promise.all(vaults.map((v) => scanHoldings(apiKey, v)));
+    if (apiKey && allVaultAddrs.length) {
+      const perVault = await Promise.all(
+        allVaultAddrs.map((v) => scanHoldings(apiKey, v))
+      );
       const holdings = perVault.flat();
 
       if (holdings.length) {
@@ -138,6 +185,9 @@ export async function GET() {
       chainId: 8453,
       factory: FACTORY_ADDRESS,
       vaults: n,
+      vaultsTotal: n + (agentVaults ?? 0),
+      agentFactory: AGENT_FACTORY_ADDRESS,
+      agentVaults,
       tvlUsd: Math.round(tvlUsd * 100) / 100,
       tvlByToken,
       rebalances,
@@ -145,6 +195,7 @@ export async function GET() {
       activeUsers,
       sources: {
         vaults: "onchain",
+        agentVaults: "onchain",
         tvlUsd: "onchain",
         rebalances: "execution-log",
         deposits: "execution-log",

@@ -12,6 +12,7 @@ import { useUserVault } from "@/hooks/use-user-vault";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PairPermissions } from "./pair-permissions";
+import { formatUsd } from "@/lib/utils";
 
 export type SavedPair = {
   id: string;
@@ -292,7 +293,7 @@ export function SavedPairs({ onSelectPair }: SavedPairsProps) {
                         {pct1.toFixed(1)}%
                         {usd1 > 0 && (
                           <span className="ml-1 text-muted-foreground/70">
-                            ${usd1.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                            {formatUsd(usd1)}
                           </span>
                         )}
                       </span>
@@ -313,7 +314,7 @@ export function SavedPairs({ onSelectPair }: SavedPairsProps) {
                         {pct2.toFixed(1)}%
                         {usd2 > 0 && (
                           <span className="ml-1 text-muted-foreground/70">
-                            ${usd2.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                            {formatUsd(usd2)}
                           </span>
                         )}
                       </span>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { formatUsd } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Protocol stats — Rebalancer",
@@ -13,6 +14,8 @@ type Stats = {
   network?: string;
   factory?: string;
   vaults?: number;
+  agentVaults?: number | null;
+  agentFactory?: string;
   tvlUsd?: number;
   tvlByToken?: Record<string, number>;
   rebalances?: number;
@@ -61,7 +64,7 @@ export default async function StatsPage() {
   const fmtUsd = (n?: number) =>
     n == null
       ? "—"
-      : `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+      : formatUsd(n);
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,11 +95,16 @@ export default async function StatsPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               <Metric
                 value={String(s.vaults ?? 0)}
                 label="Vaults deployed"
                 source={s.sources?.vaults}
+              />
+              <Metric
+                value={String(s.agentVaults ?? 0)}
+                label="Agent vaults"
+                source={s.sources?.agentVaults}
               />
               <Metric
                 value={fmtUsd(s.tvlUsd)}
