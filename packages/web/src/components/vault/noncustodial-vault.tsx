@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import {
   useAccount,
+  useBalance,
   useReadContracts,
   useWriteContract,
   usePublicClient,
@@ -19,6 +20,23 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
 // Always-available tokens (oracle majors) shown even with a zero balance.
+// Base's WETH exposes deposit() on top of the ERC-20 surface.
+const WETH_ABI = [
+  { type: "function", name: "deposit", stateMutability: "payable", inputs: [], outputs: [] },
+] as const;
+
+// Pseudo-entry so a wallet holding only ETH is not stuck: the vault takes
+// ERC-20s only, so ETH is wrapped on the way in.
+const ETH_OPTION = {
+  address: TOKENS.WETH,
+  symbol: "ETH",
+  decimals: 18,
+  isEth: true,
+} as const;
+
+// Leave enough behind for the wrap, the approve and the deposit itself.
+const ETH_GAS_BUFFER = parseUnits("0.0003", 18);
+
 const SUPPORTED = [
   { address: TOKENS.WETH, symbol: "WETH", decimals: 18 },
   { address: TOKENS.USDC, symbol: "USDC", decimals: 6 },
@@ -199,7 +217,12 @@ function VaultManager({
   });
 
   const fundTokens = useMemo(() => {
-    const map = new Map<string, { address: `0x${string}`; symbol: string; decimals: number }>();
+    const map = new Map<
+      string,
+      { address: `0x${string}`; symbol: string; decimals: number; isEth?: boolean }
+    >();
+    // Keyed by symbol so ETH and WETH can coexist despite sharing an address.
+    map.set("eth", { ...ETH_OPTION });
     for (const t of SUPPORTED) map.set(t.address.toLowerCase(), { ...t });
     for (const it of portfolioItems) {
       if (it.address === "native") continue; // ETH must be wrapped to WETH first
@@ -244,7 +267,19 @@ function VaultManager({
       },
     ],
   });
-  const walletBal = balances?.[fundTokens.length]?.result as bigint | undefined;
+  // For ETH the ERC-20 read above returns the WETH balance, which is not what
+  // the user is about to spend — read the native balance instead.
+  const { data: nativeBalance } = useBalance({ address: owner });
+  const isEthSelected = Boolean((token as { isEth?: boolean }).isEth);
+  const erc20WalletBal = balances?.[fundTokens.length]?.result as
+    | bigint
+    | undefined;
+  const rawEth = nativeBalance?.value ?? 0n;
+  const walletBal = isEthSelected
+    ? rawEth > ETH_GAS_BUFFER
+      ? rawEth - ETH_GAS_BUFFER
+      : 0n
+    : erc20WalletBal;
   const selIdx = Math.min(tokenIdx, fundTokens.length - 1);
   const vaultBalRaw = balances?.[selIdx]?.result as bigint | undefined;
   const vaultStr = vaultBalRaw != null ? formatUnits(vaultBalRaw, token.decimals) : "0";
@@ -257,6 +292,18 @@ function VaultManager({
     setBusy(true);
     try {
       const value = parseUnits(amount, token.decimals);
+
+      // ETH cannot sit in the vault, so wrap it first — one extra confirmation.
+      if ((token as { isEth?: boolean }).isEth) {
+        const wrapHash = await writeContractAsync({
+          address: TOKENS.WETH,
+          abi: WETH_ABI,
+          functionName: "deposit",
+          value,
+        });
+        await publicClient?.waitForTransactionReceipt({ hash: wrapHash });
+      }
+
       const approveHash = await writeContractAsync({
         address: token.address,
         abi: erc20Abi,

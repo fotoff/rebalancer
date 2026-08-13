@@ -14,6 +14,7 @@ import { PairCreator } from "@/components/pairs/pair-creator";
 import { SavedPairs } from "@/components/pairs/saved-pairs";
 import { VaultBalancesProvider } from "@/hooks/use-vault-balances";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SocialLinks } from "@/components/social-links";
 
 const PairDashboard = dynamic(
   () =>
@@ -148,6 +149,8 @@ export default function Home() {
               <a href="/agent-vault" className="hover:text-foreground">
                 Agents
               </a>
+              <span>&middot;</span>
+              <SocialLinks />
               <span>&middot;</span>
               <a
                 href={`https://basescan.org/address/${process.env.NEXT_PUBLIC_FACTORY_ADDRESS ?? ""}#code`}

@@ -5,6 +5,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BuiltBy, SocialLinks } from "@/components/social-links";
 
 // Rotating hero word — cycles with a fade + colour change.
 const ROTATING_WORDS = [
@@ -384,6 +385,8 @@ export function Landing() {
       </section>
 
       {/* Footer */}
+      <BuiltBy />
+
       <footer className="border-t border-border py-8">
         <div className="mx-auto max-w-4xl px-4">
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
@@ -417,6 +420,8 @@ export function Landing() {
               <a href="/stats" className="hover:text-foreground">
                 Stats
               </a>
+              <span>&middot;</span>
+              <SocialLinks />
               <span>&middot;</span>
               <a
                 href={`https://basescan.org/address/${process.env.NEXT_PUBLIC_FACTORY_ADDRESS ?? ""}#code`}
