@@ -36,10 +36,17 @@ export const config = createConfig({
     },
   },
   transports: {
+    // Our proxy first: it fronts a provider that does not rate-limit us, and
+    // keeps the API key server-side. The public endpoints stay as a fallback
+    // for when our own server is the thing that is down — but they refuse
+    // often enough that leading with them made viem report the failure as
+    // "No internet connection detected", which blamed the user's network for
+    // our transport choice.
     [base.id]: fallback([
-      http("https://mainnet.base.org"),
+      http("/api/rpc"),
       http("https://base.llamarpc.com"),
       http("https://1rpc.io/base"),
+      http("https://mainnet.base.org"),
     ]),
   },
 });
