@@ -135,10 +135,18 @@ export function AgentVaultManager() {
         abi: AGENT_FACTORY_ABI,
         functionName: "deployAgentVault",
       });
-      await publicClient?.waitForTransactionReceipt({ hash });
+      // Bounded, so a dropped transaction cannot leave the button spinning.
+      await publicClient?.waitForTransactionReceipt({ hash, timeout: 120_000 });
       await refetch();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message.slice(0, 120) : "Failed");
+      const msg = e instanceof Error ? e.message : "Failed";
+      setErr(
+        /timed out|timeout/i.test(msg)
+          ? "Not confirmed after two minutes — it may still land. Reload shortly."
+          : /rejected|denied/i.test(msg)
+            ? "Cancelled in your wallet."
+            : msg.slice(0, 120)
+      );
     } finally {
       setBusy(false);
     }

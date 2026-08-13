@@ -38,6 +38,8 @@ export function NonCustodialVault() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [stage, setStage] = useState<"confirm" | "mining" | null>(null);
+  const [pendingTx, setPendingTx] = useState<`0x${string}` | null>(null);
 
   if (!factoryConfigured) {
     return (
@@ -70,19 +72,36 @@ export function NonCustodialVault() {
     setError(null);
     setSuccess(null);
     setBusy(true);
+    // Two waits, and a user stuck on either deserves to know which one.
+    setStage("confirm");
     try {
       const hash = await writeContractAsync({
         address: FACTORY_ADDRESS,
         abi: FACTORY_ABI,
         functionName: "deployVault",
       });
-      await publicClient?.waitForTransactionReceipt({ hash });
+      setStage("mining");
+      setPendingTx(hash);
+      // Without a timeout this waits forever on a dropped transaction and the
+      // button sits at "Creating…" with nothing to act on.
+      await publicClient?.waitForTransactionReceipt({ hash, timeout: 120_000 });
       setSuccess("Your vault is deployed.");
+      setPendingTx(null);
       await refetch();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create vault");
+      const msg = e instanceof Error ? e.message : "Failed to create vault";
+      // A timeout is not a failure: the transaction may still land, so say so
+      // and leave the hash visible instead of implying it was lost.
+      setError(
+        /timed out|timeout/i.test(msg)
+          ? "Still not confirmed after two minutes. It may yet go through — check the transaction, then reload."
+          : /rejected|denied|User rejected/i.test(msg)
+            ? "Cancelled in your wallet."
+            : msg
+      );
     } finally {
       setBusy(false);
+      setStage(null);
     }
   }
 
@@ -104,8 +123,28 @@ export function NonCustodialVault() {
               swap inside the pairs and price bounds you allow.
             </p>
             <Button onClick={handleCreate} disabled={busy || isLoading}>
-              {busy ? "Creating…" : "Create my vault"}
+              {stage === "confirm"
+                ? "Confirm in your wallet…"
+                : stage === "mining"
+                  ? "Waiting for the network…"
+                  : "Create my vault"}
             </Button>
+            {stage === "confirm" && (
+              <p className="text-xs text-muted-foreground">
+                Open your wallet and approve the transaction. Nothing happens
+                until you do.
+              </p>
+            )}
+            {pendingTx && (
+              <a
+                href={`https://basescan.org/tx/${pendingTx}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                Track the transaction on BaseScan
+              </a>
+            )}
           </div>
         )}
 
