@@ -7,7 +7,7 @@ import {
   ZERO_ADDRESS,
 } from "@/lib/constants";
 import { fetchTokenLiquidity } from "@/lib/token-liquidity";
-import { vaultHistory } from "@/lib/db";
+import { vaultHistory, x402Payments } from "@/lib/db";
 import { log } from "@/lib/logger";
 import { X402_PAY_TO } from "@/lib/x402-config";
 
@@ -181,7 +181,8 @@ export async function GET() {
     // Same constant the paywall itself uses, not a separate env read — the
     // address has a fallback there, so reading the raw variable silently
     // skipped the scan.
-    let x402Payments: number | null = null;
+    let x402Count: number | null = null;
+    const seen: Array<{ txHash: string; blockNumber: string; amount: string }> = [];
     const payTo = X402_PAY_TO;
     if (payTo) {
       try {
@@ -191,7 +192,6 @@ export async function GET() {
         });
         const latest = await logClient.getBlockNumber();
         const CHUNK = 10_000n;
-        let total = 0;
         for (let i = 0n; i < 3n; i++) {
           const hi = latest - CHUNK * i;
           const lo = hi > CHUNK ? hi - CHUNK : 0n;
@@ -204,10 +204,22 @@ export async function GET() {
             fromBlock: lo,
             toBlock: hi,
           });
-          total += logs.filter((l) => l.args.value === 10_000n).length;
+          seen.push(
+            ...logs
+              .filter((l) => l.args.value === 10_000n)
+              .map((l) => ({
+                txHash: l.transactionHash,
+                blockNumber: l.blockNumber.toString(),
+                amount: (l.args.value as bigint).toString(),
+              }))
+          );
           if (lo === 0n) break;
         }
-        x402Payments = total;
+        // Record what this scan saw, then report the running total. Counting
+        // the scan alone reset to zero the moment activity aged out of the
+        // window — 112 real payments read as none.
+        x402Payments.record(seen);
+        x402Count = x402Payments.count();
       } catch (e) {
         log.warn("stats", "x402 payment scan failed", { error: String(e) });
       }
@@ -234,20 +246,24 @@ export async function GET() {
       vaultsTotal: n + (agentVaults ?? 0),
       agentFactory: AGENT_FACTORY_ADDRESS,
       agentVaults,
-      x402Payments,
+      x402Payments: x402Count,
       tvlUsd: Math.round(tvlUsd * 100) / 100,
       tvlByToken,
       rebalances,
       deposits,
-      activeUsers,
+      // Every vault has exactly one owner, so the registries are the honest
+      // count of users. The execution log only knows people who went through
+      // our operator, which missed anyone acting on their vault directly.
+      activeUsers: n + (agentVaults ?? 0),
+      activeUsersFromLog: activeUsers,
       sources: {
         vaults: "onchain",
         agentVaults: "onchain",
-        x402Payments: "onchain-recent-window",
+        x402Payments: "onchain-cumulative",
         tvlUsd: "onchain",
         rebalances: "execution-log",
         deposits: "execution-log",
-        activeUsers: "execution-log",
+        activeUsers: "onchain",
       },
       updatedAt: new Date().toISOString(),
     });

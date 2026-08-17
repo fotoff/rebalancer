@@ -63,6 +63,9 @@ const TO = process.env.TO_TOKEN || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const TRADE_FRACTION = Number(process.env.TRADE_FRACTION || 0.25); // of vault balance
 const MIN_TRADE_USD = Number(process.env.MIN_TRADE_USD || 0.5);
 
+const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const SIGNAL_PRICE = 10_000n; // $0.01, 6 decimals
+
 const LIFI_QUOTE_URL = "https://li.quest/v1/quote";
 const SLIPPAGE = 0.01; // 1%, matching the grant the UI issues
 
@@ -129,11 +132,31 @@ const log = (...a) => console.log(new Date().toISOString(), ...a);
  * signal. Without it we read the same analysis from the unpaywalled route, so a
  * dry run costs nothing.
  */
-async function getSignal(account) {
+async function getSignal(account, publicClient) {
   const body = JSON.stringify({ tokenA: FROM, tokenB: TO });
   const headers = { "content-type": "application/json" };
 
-  if (!PAY_FOR_SIGNAL) {
+  // Check we can actually afford the call. Without this the agent signs an
+  // authorisation it cannot cover, the facilitator rejects it as an invalid
+  // payload, and every cycle fails with an error that says nothing about the
+  // real cause — an empty wallet.
+  let payable = PAY_FOR_SIGNAL;
+  if (PAY_FOR_SIGNAL) {
+    const usdc = await publicClient.readContract({
+      address: USDC,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [account.address],
+    });
+    if (usdc < SIGNAL_PRICE) {
+      log(
+        `only ${formatUnits(usdc, 6)} USDC left, need 0.01 — falling back to the free signal`
+      );
+      payable = false;
+    }
+  }
+
+  if (!payable) {
     const res = await fetch(`${API}/api/ai/analyze-pair`, {
       method: "POST",
       headers,
@@ -263,7 +286,7 @@ async function cycle(publicClient, walletClient, account) {
   log("canTrade: allowed");
 
   // 2. Decide.
-  const { paid, data } = await getSignal(account);
+  const { paid, data } = await getSignal(account, publicClient);
   const { trade, why } = decide(data);
   log(`signal (${paid ? "paid $0.01 via x402" : "free"}): ${why}`);
   if (!trade && !FORCE) {

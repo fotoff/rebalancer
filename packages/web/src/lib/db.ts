@@ -114,6 +114,18 @@ function runMigrations(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_ai_rec_user ON ai_recommendations(user_address);
     CREATE INDEX IF NOT EXISTS idx_ai_rec_pair ON ai_recommendations(pair_id);
 
+    -- x402 payments seen on-chain, keyed by transaction hash.
+    -- The chain scan can only look back a bounded window, so counting from the
+    -- scan alone made real activity disappear once it scrolled out of range.
+    -- Recording each payment keeps the total monotonic without ever inventing
+    -- one: every row is a transaction that was actually observed.
+    CREATE TABLE IF NOT EXISTS x402_payments (
+      tx_hash      TEXT PRIMARY KEY,
+      block_number INTEGER NOT NULL,
+      amount       TEXT NOT NULL,
+      seen_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS ai_policy_violations (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       recommendation_id   TEXT NOT NULL,
@@ -371,6 +383,31 @@ export const triggers = {
 };
 
 // ─── Vault History ───────────────────────────────────────
+export const x402Payments = {
+  /** Record payments seen in a scan. Existing hashes are left untouched. */
+  record(rows: Array<{ txHash: string; blockNumber: string; amount: string }>) {
+    if (!rows.length) return;
+    const stmt = getDb().prepare(
+      `INSERT OR IGNORE INTO x402_payments (tx_hash, block_number, amount)
+       VALUES (?, ?, ?)`
+    );
+    const many = getDb().transaction(
+      (list: Array<{ txHash: string; blockNumber: string; amount: string }>) => {
+        for (const r of list) stmt.run(r.txHash, Number(r.blockNumber), r.amount);
+      }
+    );
+    many(rows);
+  },
+
+  /** Total distinct payments ever observed. */
+  count(): number {
+    const row = getDb()
+      .prepare("SELECT COUNT(*) AS n FROM x402_payments")
+      .get() as { n: number } | undefined;
+    return row?.n ?? 0;
+  },
+};
+
 export const vaultHistory = {
   /** Protocol-wide event counts by type (for public stats). */
   countByType(): Record<string, number> {
