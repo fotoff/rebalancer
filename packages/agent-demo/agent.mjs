@@ -18,7 +18,8 @@
  *
  *   node agent.mjs --once            # one dry cycle, free signal, no broadcast
  *   node agent.mjs --once --force    # ignore the signal (testing/demo only)
- *   node agent.mjs --once --pay      # same, but actually pay $0.01 over x402
+ *   node agent.mjs --once --pay      # probe free, pay $0.01 only if there is a signal
+ *   node agent.mjs --once --pay-always  # pay for every poll (demo of the flow)
  *   node agent.mjs --execute         # live: real trades, on a loop
  */
 
@@ -49,6 +50,10 @@ const PAY_FOR_SIGNAL = argv.has("--pay");
 // Override the signal gate. The chain still enforces every limit — this only
 // skips *our* opinion about whether the trade is worth making.
 const FORCE = argv.has("--force");
+// Pay for every poll instead of probing first. Kept for demonstrating the
+// payment flow; probing is the sane default because most polls have no answer
+// worth buying.
+const PAY_ALWAYS = argv.has("--pay-always");
 
 // ─── Config ───────────────────────────────────────────────
 const RPC_URL = process.env.BASE_RPC_URL || "https://mainnet.base.org";
@@ -153,6 +158,31 @@ async function getSignal(account, publicClient) {
         `only ${formatUnits(usdc, 6)} USDC left, need 0.01 — falling back to the free signal`
       );
       payable = false;
+    }
+  }
+
+  // Ask for free whether anything is worth buying. Skipped with --pay-always.
+  if (payable && !PAY_ALWAYS) {
+    try {
+      const probe = await fetch(`${API}/api/x402/probe`, {
+        method: "POST",
+        headers,
+        body,
+      });
+      if (probe.ok) {
+        const p = await probe.json();
+        if (!p.signal) {
+          log("probe: no signal — not buying");
+          return { paid: false, probed: true, data: { action: "HOLD" } };
+        }
+        log("probe: signal available — buying");
+      } else {
+        // A failed probe must not silently become a free-route decision: fall
+        // through and pay, rather than trade on a cheaper answer by accident.
+        log(`probe unavailable (HTTP ${probe.status}) — buying anyway`);
+      }
+    } catch (e) {
+      log(`probe failed (${String(e.message).slice(0, 60)}) — buying anyway`);
     }
   }
 
@@ -286,9 +316,11 @@ async function cycle(publicClient, walletClient, account) {
   log("canTrade: allowed");
 
   // 2. Decide.
-  const { paid, data } = await getSignal(account, publicClient);
+  const { paid, probed, data } = await getSignal(account, publicClient);
   const { trade, why } = decide(data);
-  log(`signal (${paid ? "paid $0.01 via x402" : "free"}): ${why}`);
+  log(
+    `signal (${paid ? "paid $0.01 via x402" : probed ? "free probe" : "free"}): ${why}`
+  );
   if (!trade && !FORCE) {
     log("holding — signal does not favour rebalancing");
     return;
