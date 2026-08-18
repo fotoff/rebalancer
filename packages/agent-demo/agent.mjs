@@ -31,6 +31,8 @@ import {
   formatUnits,
   parseUnits,
 } from "viem";
+import { keccak256, encodePacked, parseAbiItem, parseEventLogs } from "viem";
+import { appendFileSync } from "node:fs";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 
@@ -103,6 +105,21 @@ const VAULT_ABI = [
   },
   {
     type: "function",
+    name: "permissions",
+    stateMutability: "view",
+    inputs: [{ type: "address" }, { type: "bytes32" }],
+    outputs: [
+      { name: "enabled", type: "bool" },
+      { name: "maxSlippageBps", type: "uint16" },
+      { name: "cooldown", type: "uint32" },
+      { name: "lastExec", type: "uint64" },
+      { name: "expiresAt", type: "uint64" },
+      { name: "maxNotional", type: "uint128" },
+      { name: "trustAgentMinOut", type: "bool" },
+    ],
+  },
+  {
+    type: "function",
     name: "agentTrade",
     stateMutability: "nonpayable",
     inputs: [
@@ -128,6 +145,66 @@ function requireEnv() {
 }
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
+
+// ─── Execution receipt ────────────────────────────────────
+
+/**
+ * A record of what the agent was permitted to do, what it decided, and what
+ * happened — written every cycle, including the cycles where it does nothing.
+ *
+ * Refusals are the point. A well-behaved agent checks canTrade() and stays
+ * home, which leaves no transaction and no event, so on-chain history cannot
+ * distinguish restraint from inactivity — while an agent that spams doomed
+ * transactions at least leaves failed ones. Recording the refusal is the only
+ * way round that, and it has to happen here: a revert rolls back its own logs,
+ * so the contract cannot report why it said no.
+ */
+const RECEIPTS_FILE = process.env.RECEIPTS_FILE || "receipts.jsonl";
+
+const pairKey = (a, b) =>
+  keccak256(encodePacked(["address", "address"], [a, b]));
+
+/** Read the grant as it stands right now, straight from the vault. */
+async function readGrant(publicClient, agent) {
+  const [p, remaining] = await Promise.all([
+    publicClient.readContract({
+      address: VAULT,
+      abi: VAULT_ABI,
+      functionName: "permissions",
+      args: [agent, pairKey(FROM, TO)],
+    }),
+    publicClient.readContract({
+      address: VAULT,
+      abi: VAULT_ABI,
+      functionName: "remainingBudget",
+      args: [agent, FROM],
+    }),
+  ]);
+  const [enabled, maxSlippageBps, cooldown, lastExec, expiresAt, maxNotional, trustAgentMinOut] = p;
+  const unlimited = (v) => (v === 0n ? "unlimited" : formatUnits(v, 18));
+  return {
+    enabled,
+    max_slippage_bps: Number(maxSlippageBps),
+    cooldown_s: Number(cooldown),
+    last_exec: lastExec === 0n ? null : new Date(Number(lastExec) * 1000).toISOString(),
+    stale_after: expiresAt === 0n ? null : new Date(Number(expiresAt) * 1000).toISOString(),
+    max_per_trade: unlimited(maxNotional),
+    // Whose number becomes the floor: the oracle's, or the agent's own quote.
+    quote_source: trustAgentMinOut ? "agent" : "oracle",
+    budget_24h_remaining:
+      remaining > 2n ** 200n ? "unlimited" : formatUnits(remaining, 18),
+  };
+}
+
+function writeReceipt(r) {
+  const line = JSON.stringify({ ts: new Date().toISOString(), ...r });
+  try {
+    appendFileSync(new URL(RECEIPTS_FILE, import.meta.url), line + "\n");
+  } catch (e) {
+    log(`could not write receipt: ${String(e.message).slice(0, 60)}`);
+  }
+  log(`receipt: ${r.outcome}${r.reason ? " — " + r.reason : ""}`);
+}
 
 // ─── Signal ───────────────────────────────────────────────
 
@@ -272,6 +349,12 @@ async function getQuote(amountIn) {
 // ─── One cycle ────────────────────────────────────────────
 
 async function cycle(publicClient, walletClient, account) {
+  const base = {
+    agent: account.address,
+    vault: VAULT,
+    pair: { from: FROM, to: TO },
+  };
+
   // How much are we willing to move? A fraction of what the vault holds.
   const [balance, decimals, symbol] = await Promise.all([
     publicClient.readContract({
@@ -293,7 +376,11 @@ async function cycle(publicClient, walletClient, account) {
   ]);
 
   if (balance === 0n) {
-    log(`vault holds no ${symbol} — nothing to rebalance`);
+    writeReceipt({
+      ...base,
+      outcome: "NO_OP",
+      reason: `vault holds no ${symbol}`,
+    });
     return;
   }
 
@@ -301,6 +388,12 @@ async function cycle(publicClient, walletClient, account) {
     (balance * BigInt(Math.round(TRADE_FRACTION * 10_000))) / 10_000n;
   const human = formatUnits(amountIn, decimals);
   log(`vault ${symbol} balance ${formatUnits(balance, decimals)}, trading ${human}`);
+
+  // Snapshot the grant before acting, so the receipt shows the limits that
+  // applied to this decision rather than whatever they are when it is read.
+  const grant = await readGrant(publicClient, account.address);
+  base.grant = grant;
+  base.intent = { amount_in: human, token: symbol };
 
   // 1. Ask the vault first — cheaper than a reverted transaction.
   const [allowed, reason] = await publicClient.readContract({
@@ -310,10 +403,16 @@ async function cycle(publicClient, walletClient, account) {
     args: [account.address, FROM, TO, amountIn],
   });
   if (!allowed) {
-    log(`vault says no: ${reason}`);
+    writeReceipt({
+      ...base,
+      preflight: { allowed: false, reason },
+      outcome: "REFUSED_BY_VAULT",
+      reason,
+    });
     return;
   }
   log("canTrade: allowed");
+  base.preflight = { allowed: true, reason: "" };
 
   // 2. Decide.
   const { paid, probed, data } = await getSignal(account, publicClient);
@@ -321,8 +420,17 @@ async function cycle(publicClient, walletClient, account) {
   log(
     `signal (${paid ? "paid $0.01 via x402" : probed ? "free probe" : "free"}): ${why}`
   );
+  base.signal = {
+    source: paid ? "x402-paid" : probed ? "free-probe" : "free",
+    paid_usdc: paid ? "0.01" : "0.00",
+    verdict: why,
+  };
   if (!trade && !FORCE) {
-    log("holding — signal does not favour rebalancing");
+    writeReceipt({
+      ...base,
+      outcome: "HELD",
+      reason: "signal does not favour rebalancing",
+    });
     return;
   }
   if (!trade && FORCE) {
@@ -336,8 +444,13 @@ async function cycle(publicClient, walletClient, account) {
   );
 
   // 4. Trade. The vault raises our min-out to the oracle floor if it is higher.
+  base.route = {
+    tool: quote.tool,
+    min_out: quote.toAmountMin.toString(),
+    quote_source: grant.quote_source,
+  };
   if (!EXECUTE) {
-    log("DRY RUN — would call agentTrade(); pass --execute to broadcast");
+    writeReceipt({ ...base, outcome: "DRY_RUN", reason: "not broadcast" });
     return;
   }
 
@@ -348,8 +461,36 @@ async function cycle(publicClient, walletClient, account) {
     args: [FROM, TO, amountIn, quote.router, quote.swapData, quote.toAmountMin],
   });
   log(`submitted ${hash}`);
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  log(`${receipt.status} in block ${receipt.blockNumber}`);
+  const txReceipt = await publicClient.waitForTransactionReceipt({ hash });
+  log(`${txReceipt.status} in block ${txReceipt.blockNumber}`);
+
+  // Post-trade readback from the chain, not from what we asked for: the vault
+  // may have raised min-out to the oracle floor, and the fee is only known
+  // after the fact.
+  let readback = null;
+  try {
+    const ev = parseAbiItem(
+      "event AgentTraded(address indexed agent, address indexed from, address indexed to, uint256 amountIn, uint256 netOut, uint256 fee)"
+    );
+    const logs = parseEventLogs({ abi: [ev], logs: txReceipt.logs });
+    if (logs.length) {
+      readback = {
+        amount_in: logs[0].args.amountIn.toString(),
+        net_out: logs[0].args.netOut.toString(),
+        fee: logs[0].args.fee.toString(),
+      };
+    }
+  } catch {
+    /* readback is a nicety; its absence must not fail the cycle */
+  }
+
+  writeReceipt({
+    ...base,
+    outcome: txReceipt.status === "success" ? "TRADED" : "REVERTED",
+    reason: txReceipt.status === "success" ? "" : "transaction reverted on-chain",
+    tx: { hash, block: txReceipt.blockNumber.toString(), status: txReceipt.status },
+    readback,
+  });
 }
 
 // ─── Main ─────────────────────────────────────────────────
@@ -373,7 +514,13 @@ async function main() {
     try {
       await cycle(publicClient, walletClient, account);
     } catch (e) {
-      log(`cycle failed: ${e.message}`);
+      writeReceipt({
+        agent: account.address,
+        vault: VAULT,
+        pair: { from: FROM, to: TO },
+        outcome: "ERROR",
+        reason: String(e.message).slice(0, 200),
+      });
     }
   };
 
